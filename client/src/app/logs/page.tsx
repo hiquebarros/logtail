@@ -76,7 +76,7 @@ export default function LogsPage() {
   }, [isAtBottom, live]);
 
   return (
-    <main className="flex h-[calc(100vh-49px)] flex-col bg-zinc-950 text-zinc-100">
+    <main className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <LogFiltersBar
         filters={filters}
         services={availableServices}

@@ -3,6 +3,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { LogFiltersBar } from "@/components/filters/log-filters-bar";
+import { LogTimeline } from "@/components/logs/LogTimeline";
 import { LogDetailsPanel } from "@/components/log-viewer/log-details-panel";
 import { LogList } from "@/components/log-viewer/log-list";
 import { fetchLogsPage } from "@/lib/api/client";
@@ -18,12 +19,17 @@ const defaultFilters: LogFilters = {
 };
 
 export default function LogsPage() {
+  const initialNow = Date.now();
   const [filters, setFilters] = useState<LogFilters>(defaultFilters);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
   const [live, setLive] = useState(false);
   const [scrollToEndSignal, setScrollToEndSignal] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [from, setFrom] = useState<number>(
+    initialNow - defaultFilters.rangeMinutes * 60 * 1000
+  );
+  const [to, setTo] = useState<number>(initialNow);
   const debouncedQuery = useDebouncedValue(filters.query, 250);
 
   const stableFilters = useMemo(
@@ -49,6 +55,14 @@ export default function LogsPage() {
   );
 
   const logs = useMemo(() => [...baseLogs, ...liveLogs], [baseLogs, liveLogs]);
+  const visibleLogs = useMemo(
+    () =>
+      logs.filter((log) => {
+        const ts = new Date(log.timestamp).getTime();
+        return Number.isFinite(ts) && ts >= from && ts <= to;
+      }),
+    [from, logs, to]
+  );
 
   const availableServices = useMemo(() => {
     const fromApi = logsQuery.data?.pages[0]?.availableServices ?? [];
@@ -75,6 +89,12 @@ export default function LogsPage() {
     };
   }, [isAtBottom, live]);
 
+  useEffect(() => {
+    const now = Date.now();
+    setFrom(now - filters.rangeMinutes * 60 * 1000);
+    setTo(now);
+  }, [filters.rangeMinutes]);
+
   return (
     <main className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <LogFiltersBar
@@ -92,6 +112,17 @@ export default function LogsPage() {
           setLiveLogs([]);
         }}
       />
+      <div className="border-b border-zinc-800 px-3 py-2">
+        <LogTimeline
+          logs={logs}
+          from={from}
+          to={to}
+          onRangeChange={(nextFrom, nextTo) => {
+            setFrom(nextFrom);
+            setTo(nextTo);
+          }}
+        />
+      </div>
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_420px]">
         <section className="min-h-0 border-r border-zinc-800">
           <div className="grid grid-cols-[190px_90px_1fr_120px_220px] gap-3 border-b border-zinc-800 px-3 py-2 text-[10px] uppercase tracking-wide text-zinc-500">
@@ -102,7 +133,7 @@ export default function LogsPage() {
             <span>Metadata</span>
           </div>
           <LogList
-            logs={logs}
+            logs={visibleLogs}
             selectedLogId={selectedLog?.id ?? null}
             hasMore={Boolean(logsQuery.hasNextPage)}
             isFetchingNextPage={logsQuery.isFetchingNextPage}

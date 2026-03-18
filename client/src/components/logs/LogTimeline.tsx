@@ -54,8 +54,11 @@ export function getBucketSize(rangeMs: number): number {
   if (rangeMs <= 60 * 60 * 1000) {
     return 5000;
   }
+  if (rangeMs <= 12 * 60 * 60 * 1000) {
+    return 5 * 60 * 1000;
+  }
   if (rangeMs <= 24 * 60 * 60 * 1000) {
-    return 60 * 1000;
+    return 10 * 60 * 1000;
   }
 
   return 10 * 60 * 1000;
@@ -151,8 +154,11 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
     () => aggregateBuckets(logs, from, to, bucketSize),
     [logs, from, to, bucketSize]
   );
-  const chartData = useMemo(() => buckets.map((bucket) => [bucket.ts, bucket.count]), [buckets]);
   const chartCounts = useMemo(() => buckets.map((bucket) => bucket.count), [buckets]);
+  const maxBucketCount = useMemo(
+    () => buckets.reduce((max, bucket) => Math.max(max, bucket.count), 0),
+    [buckets]
+  );
   const nonZeroBuckets = useMemo(
     () => buckets.filter((bucket) => bucket.count > 0).length,
     [buckets]
@@ -203,6 +209,13 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
               ? localBuckets[dataIndex].ts
               : Number.NaN;
           if (!Number.isFinite(clickedTs)) {
+            return;
+          }
+          const clickedBucket =
+            Number.isFinite(dataIndex) && localBuckets[dataIndex]
+              ? localBuckets[dataIndex]
+              : undefined;
+          if (!clickedBucket || clickedBucket.count === 0) {
             return;
           }
 
@@ -271,17 +284,19 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
           type: "value",
           show: false,
           min: 0,
-          minInterval: 1
+          minInterval: 1,
+          max: Math.max(1, maxBucketCount)
         },
         series: [
           {
             type: "bar",
-            barMinHeight: 2,
+            barMinHeight: 0,
             barCategoryGap: "0%",
             barGap: "0%",
-            barWidth: "80%",
+            barWidth: "90%",
             itemStyle: {
-              color: "#06b6d4"
+              color: (params: { value: number }) =>
+                params.value > 0 ? "#06b6d4" : "rgba(63, 63, 70, 0.35)"
             },
             emphasis: {
               itemStyle: {
@@ -300,7 +315,7 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
     return () => {
       window.removeEventListener("resize", onResize);
     };
-  }, [buckets, chartCounts, from, isReady, to]);
+  }, [buckets, chartCounts, from, isReady, maxBucketCount, to]);
 
   if (loadError) {
     return (
@@ -315,6 +330,9 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
       <div ref={chartRef} className="h-full w-full" />
       <div className="pointer-events-none absolute left-2 top-1 text-[10px] text-zinc-500">
         {totalLogsInRange} logs in range
+      </div>
+      <div className="pointer-events-none absolute right-2 top-1 text-[10px] text-zinc-600">
+        bucket {Math.round(bucketSize / 1000)}s
       </div>
       {nonZeroBuckets === 0 ? (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-zinc-500">

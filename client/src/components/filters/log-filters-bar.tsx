@@ -13,6 +13,7 @@ type Props = {
 const RANGE_OPTIONS = [
   { label: "5m", value: 5 },
   { label: "1h", value: 60 },
+  { label: "12h", value: 12 * 60 },
   { label: "24h", value: 24 * 60 },
 ];
 

@@ -1,12 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const app_1 = require("./app");
-const prisma_1 = require("./db/prisma");
+const client_1 = require("./prisma/client");
 async function startServer() {
-    const app = (0, app_1.buildApp)();
+    const app = await (0, app_1.buildApp)();
     const port = Number(process.env.PORT || 3000);
     try {
-        await prisma_1.prisma.$connect();
+        await client_1.prisma.$connect();
         await app.listen({ host: "0.0.0.0", port });
     }
     catch (error) {
@@ -15,11 +15,11 @@ async function startServer() {
     }
 }
 process.on("SIGINT", async () => {
-    await prisma_1.prisma.$disconnect();
+    await client_1.prisma.$disconnect();
     process.exit(0);
 });
 process.on("SIGTERM", async () => {
-    await prisma_1.prisma.$disconnect();
+    await client_1.prisma.$disconnect();
     process.exit(0);
 });
 void startServer();

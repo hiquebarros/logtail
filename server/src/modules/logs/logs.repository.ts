@@ -1,5 +1,5 @@
 import { Prisma, type Log as PrismaLog } from "@prisma/client";
-import { prisma } from "../../db/prisma";
+import { prisma } from "../../prisma/client";
 import { CreateLogInput, GetLogsFilters } from "./logs.types";
 
 type FindLogsParams = GetLogsFilters;

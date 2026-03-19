@@ -1,7 +1,10 @@
 import Fastify, { FastifyInstance } from "fastify";
+import { registerAuthPlugin } from "./plugins/auth";
+import { registerSessionPlugin } from "./plugins/session";
+import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerLogsController } from "./modules/logs/logs.controller";
 
-export function buildApp(): FastifyInstance {
+export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -21,7 +24,10 @@ export function buildApp(): FastifyInstance {
     return { status: "ok" };
   });
 
-  void registerLogsController(app);
+  await registerSessionPlugin(app);
+  await registerAuthPlugin(app);
+  await registerAuthRoutes(app);
+  await registerLogsController(app);
 
   return app;
 }

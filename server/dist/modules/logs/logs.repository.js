@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LogsRepository = void 0;
 const client_1 = require("@prisma/client");
-const prisma_1 = require("../../db/prisma");
+const client_2 = require("../../prisma/client");
 class LogsRepository {
     async findLogs(params) {
         const baseWhere = {
@@ -51,14 +51,14 @@ class LogsRepository {
                 ]
             }
             : baseWhere;
-        return prisma_1.prisma.log.findMany({
+        return client_2.prisma.log.findMany({
             where,
             orderBy: [{ timestamp: "desc" }, { id: "desc" }],
             take: params.limit + 1
         });
     }
     async createBatch(organizationId, applicationId, logs) {
-        const result = await prisma_1.prisma.log.createMany({
+        const result = await client_2.prisma.log.createMany({
             data: logs.map((log) => ({
                 organizationId,
                 applicationId,
@@ -73,7 +73,7 @@ class LogsRepository {
         return result.count;
     }
     async findNewLogs(organizationId, applicationId, since) {
-        return prisma_1.prisma.log.findMany({
+        return client_2.prisma.log.findMany({
             where: {
                 organizationId,
                 applicationId,
@@ -98,14 +98,14 @@ class LogsRepository {
             timestamp: { gte: from }
         };
         const [totalLogs, totalErrors, totalWarnings] = await Promise.all([
-            prisma_1.prisma.log.count({ where }),
-            prisma_1.prisma.log.count({ where: { ...where, level: "error" } }),
-            prisma_1.prisma.log.count({ where: { ...where, level: "warn" } })
+            client_2.prisma.log.count({ where }),
+            client_2.prisma.log.count({ where: { ...where, level: "error" } }),
+            client_2.prisma.log.count({ where: { ...where, level: "warn" } })
         ]);
         return { totalLogs, totalErrors, totalWarnings };
     }
     async getLogsPerMinute(organizationId, applicationId, from) {
-        const rows = await prisma_1.prisma.$queryRaw `
+        const rows = await client_2.prisma.$queryRaw `
       SELECT
         date_trunc('minute', "timestamp") AS "timestamp",
         COUNT(*)::bigint AS "logs",
@@ -124,7 +124,7 @@ class LogsRepository {
         }));
     }
     async getTopServices(organizationId, applicationId, from) {
-        const rows = await prisma_1.prisma.$queryRaw `
+        const rows = await client_2.prisma.$queryRaw `
       SELECT
         COALESCE("metadata"->>'service', 'unknown') AS "service",
         COUNT(*)::bigint AS "count"

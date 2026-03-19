@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -225,9 +226,32 @@ async function seedLogs(): Promise<void> {
   console.log(`Seeded ${allLogs.length} logs.`);
 }
 
+async function seedAuthUsers(): Promise<void> {
+  const passwordHash = await bcrypt.hash("password123", 10);
+  const organizationId = ORGANIZATIONS[0].id;
+
+  await prisma.user.upsert({
+    where: {
+      organizationId_email: {
+        organizationId,
+        email: "admin@logtail.dev"
+      }
+    },
+    update: { password: passwordHash },
+    create: {
+      organizationId,
+      email: "admin@logtail.dev",
+      password: passwordHash
+    }
+  });
+
+  console.log("Seeded auth user admin@logtail.dev.");
+}
+
 async function main(): Promise<void> {
-  await seedOrganizationsAndApplications();
+  //await seedOrganizationsAndApplications();
   await seedLogs();
+  //await seedAuthUsers();
 }
 
 main()

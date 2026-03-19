@@ -23,6 +23,7 @@ model User {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   email          String       @db.VarChar(255)
+  password       String?      @db.VarChar(255)
   name           String?      @db.VarChar(255)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")

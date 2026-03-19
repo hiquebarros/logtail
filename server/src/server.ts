@@ -1,8 +1,8 @@
 import { buildApp } from "./app";
-import { prisma } from "./db/prisma";
+import { prisma } from "./prisma/client";
 
 async function startServer(): Promise<void> {
-  const app = buildApp();
+  const app = await buildApp();
   const port = Number(process.env.PORT || 3000);
 
   try {

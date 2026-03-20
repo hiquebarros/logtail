@@ -156,7 +156,6 @@ export function LogsPageClient() {
   });
 
   const handleReachEnd = useCallback(() => {
-    console.log("handleReachEnd");
     if (!logsQuery.hasNextPage || logsQuery.isFetchingNextPage) return;
     void logsQuery.fetchNextPage();
   }, [logsQuery.fetchNextPage, logsQuery.hasNextPage, logsQuery.isFetchingNextPage]);
@@ -197,7 +196,7 @@ export function LogsPageClient() {
   }, [isAtBottom, live]);
 
   return (
-    <main className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
+    <main className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
       <LogFiltersBar
         filters={filters}
         live={live}
@@ -228,11 +227,11 @@ export function LogsPageClient() {
         />
       </div>
       <div
-        className={`grid min-h-0 flex-1 ${selectedLog ? "grid-cols-[1fr_560px]" : "grid-cols-[1fr]"}`}
+        className={`grid min-h-0 flex-1 overflow-hidden ${selectedLog ? "grid-cols-[1fr_560px]" : "grid-cols-[1fr]"}`}
       >
-        <section className="min-h-0 border-r border-zinc-800">
+        <section className="flex min-h-0 flex-col overflow-hidden border-r border-zinc-800">
           {visibleLogs.length > 0 ? (
-            <div className="grid grid-cols-[190px_90px_1fr_120px_220px] gap-3 border-b border-zinc-800 px-3 py-2 text-[10px] uppercase tracking-wide text-zinc-500">
+            <div className="grid shrink-0 grid-cols-[190px_90px_1fr_120px_220px] gap-3 border-b border-zinc-800 px-3 py-2 text-[10px] uppercase tracking-wide text-zinc-500">
               <span>Timestamp</span>
               <span>Level</span>
               <span>Message</span>
@@ -275,16 +274,18 @@ export function LogsPageClient() {
               }}
             />
           ) : (
-            <LogList
-              logs={visibleLogs}
-              selectedLogId={selectedLog?.id ?? null}
-              hasMore={Boolean(logsQuery.hasNextPage)}
-              isFetchingNextPage={logsQuery.isFetchingNextPage}
-              scrollToEndSignal={scrollToEndSignal}
-              onReachEnd={handleReachEnd}
-              onSelectLog={setSelectedLog}
-              onScrollStateChange={setIsAtBottom}
-            />
+            <div className="min-h-0 flex-1">
+              <LogList
+                logs={visibleLogs}
+                selectedLogId={selectedLog?.id ?? null}
+                hasMore={Boolean(logsQuery.hasNextPage)}
+                isFetchingNextPage={logsQuery.isFetchingNextPage}
+                scrollToEndSignal={scrollToEndSignal}
+                onReachEnd={handleReachEnd}
+                onSelectLog={setSelectedLog}
+                onScrollStateChange={setIsAtBottom}
+              />
+            </div>
           )}
         </section>
         {selectedLog ? (

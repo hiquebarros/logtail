@@ -56,7 +56,7 @@ export function LogList({
   return (
     <div
       ref={parentRef}
-      className="h-full overflow-auto"
+      className="h-full overflow-y-auto overscroll-contain"
       onScroll={(event) => {
         const target = event.currentTarget;
         const isAtBottom =

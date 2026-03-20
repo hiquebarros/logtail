@@ -1,0 +1,49 @@
+services:
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      CI: "true"
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
+      NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-0000-0000-000000000001}
+      NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-0000-0000-000000000001}
+    volumes:
+      - ./client:/app
+      - client_node_modules:/app/node_modules
+      - client_next:/app/.next
+    command: sh -c "pnpm install --frozen-lockfile --force && pnpm exec next dev --webpack -H 0.0.0.0 -p 3000"
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      PORT: ${PORT:-3001}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+    volumes:
+      - ./server:/app
+      - server_node_modules:/app/node_modules
+    command: sh -c "npm ci && npm run prisma:generate && npm run dev"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  client_node_modules:
+  client_next:
+  server_node_modules:

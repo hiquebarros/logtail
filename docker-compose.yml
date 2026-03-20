@@ -3,36 +3,45 @@ services:
     build:
       context: ./client
       dockerfile: Dockerfile
+      target: runner
     container_name: logtail-client
+    restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - path: ./.env
+        required: false
     environment:
-      NEXT_PUBLIC_API_URL: http://server:3001
-      NEXT_PUBLIC_ORGANIZATION_ID: 10000000-0000-0000-0000-000000000001
-      NEXT_PUBLIC_APPLICATION_ID: 20000000-0000-0000-0000-000000000001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
+      NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-0000-0000-000000000001}
+      NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-0000-0000-000000000001}
     depends_on:
-      - server
+      server:
+        condition: service_started
 
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
+      target: runner
     container_name: logtail-server
+    restart: unless-stopped
     ports:
       - "3001:3001"
+    env_file:
+      - path: ./.env
+        required: false
     environment:
-      PORT: 3001
-      DB_HOST: db
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: logtail
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/logtail?schema=public
-    command: sh -c "
-      npm run prisma:generate &&
-      npx prisma migrate deploy &&
-      npm run start
-      "
+      NODE_ENV: production
+      PORT: ${PORT:-3001}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-env}
+    command: sh -c "npm run prisma:migrate && npm run start"
     depends_on:
       db:
         condition: service_healthy
@@ -40,16 +49,17 @@ services:
   db:
     image: postgres:16-alpine
     container_name: logtail-db
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: logtail
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-logtail}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d logtail"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-logtail}"]
       interval: 5s
       timeout: 5s
       retries: 10

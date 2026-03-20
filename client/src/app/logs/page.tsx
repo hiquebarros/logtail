@@ -123,7 +123,9 @@ export default function LogsPage() {
           }}
         />
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[1fr_420px]">
+      <div
+        className={`grid min-h-0 flex-1 ${selectedLog ? "grid-cols-[1fr_560px]" : "grid-cols-[1fr]"}`}
+      >
         <section className="min-h-0 border-r border-zinc-800">
           <div className="grid grid-cols-[190px_90px_1fr_120px_220px] gap-3 border-b border-zinc-800 px-3 py-2 text-[10px] uppercase tracking-wide text-zinc-500">
             <span>Timestamp</span>
@@ -143,7 +145,9 @@ export default function LogsPage() {
             onScrollStateChange={setIsAtBottom}
           />
         </section>
-        <LogDetailsPanel log={selectedLog} onClose={() => setSelectedLog(null)} />
+        {selectedLog ? (
+          <LogDetailsPanel log={selectedLog} onClose={() => setSelectedLog(null)} />
+        ) : null}
       </div>
     </main>
   );

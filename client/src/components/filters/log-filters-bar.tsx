@@ -48,7 +48,7 @@ export function LogFiltersBar({
               key={option.value}
               type="button"
               onClick={() => onChange({ ...filters, rangeMinutes: option.value })}
-              className={`rounded px-2.5 py-1 text-xs transition ${
+              className={`cursor-pointer rounded px-2.5 py-1 text-xs transition ${
                 filters.rangeMinutes === option.value
                   ? "bg-cyan-600 text-white"
                   : "text-zinc-300 hover:bg-zinc-800"
@@ -61,7 +61,7 @@ export function LogFiltersBar({
         <button
           type="button"
           onClick={() => onLiveChange(!live)}
-          className={`h-9 rounded-md border px-3 text-sm font-medium transition ${
+          className={`h-9 cursor-pointer rounded-md border px-3 text-sm font-medium transition ${
             live
               ? "border-emerald-500/50 bg-emerald-600/20 text-emerald-300"
               : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
@@ -71,88 +71,6 @@ export function LogFiltersBar({
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 text-xs">
-        <div className="flex items-center gap-1">
-          {LEVELS.map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() =>
-                onChange({
-                  ...filters,
-                  levels: toggleInArray(filters.levels, level),
-                })
-              }
-              className={`rounded border px-2 py-1 uppercase tracking-wide ${
-                filters.levels.includes(level)
-                  ? "border-cyan-500 bg-cyan-500/20 text-cyan-200"
-                  : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
-              }`}
-            >
-              {level}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-1">
-          {ENVIRONMENTS.map((env) => (
-            <button
-              key={env}
-              type="button"
-              onClick={() =>
-                onChange({
-                  ...filters,
-                  environments: toggleInArray(filters.environments, env),
-                })
-              }
-              className={`rounded border px-2 py-1 ${
-                filters.environments.includes(env)
-                  ? "border-violet-500 bg-violet-500/20 text-violet-200"
-                  : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
-              }`}
-            >
-              {env}
-            </button>
-          ))}
-        </div>
-
-        <select
-          value=""
-          onChange={(event) => {
-            const service = event.target.value;
-            if (!service) return;
-            onChange({
-              ...filters,
-              services: toggleInArray(filters.services, service),
-            });
-            event.target.value = "";
-          }}
-          className="h-7 rounded border border-zinc-700 bg-zinc-900 px-2 text-zinc-200"
-        >
-          <option value="">Add service filter</option>
-          {services.map((service) => (
-            <option key={service} value={service}>
-              {service}
-            </option>
-          ))}
-        </select>
-
-        {filters.services.map((service) => (
-          <button
-            key={service}
-            type="button"
-            onClick={() =>
-              onChange({
-                ...filters,
-                services: filters.services.filter((item) => item !== service),
-              })
-            }
-            className="rounded border border-amber-500/60 bg-amber-500/10 px-2 py-1 text-amber-200"
-          >
-            service:{service} x
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

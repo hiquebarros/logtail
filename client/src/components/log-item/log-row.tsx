@@ -19,7 +19,7 @@ export function LogRow({ log, selected, onClick }: Props) {
     <button
       type="button"
       onClick={onClick}
-      className={`grid w-full grid-cols-[190px_90px_1fr_120px_220px] items-center gap-3 border-b border-zinc-900 px-3 py-2 text-left text-xs transition hover:bg-zinc-900 ${
+      className={`grid w-full grid-cols-[190px_90px_1fr_120px_220px] items-center gap-3 border-b border-zinc-900 px-3 py-2 text-left text-xs transition hover:bg-zinc-900/70 hover:opacity-90 ${
         selected ? "bg-zinc-900/90" : "bg-transparent"
       }`}
     >

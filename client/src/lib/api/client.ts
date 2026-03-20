@@ -4,7 +4,8 @@ import type { MetricsResponse } from "@/lib/types/metrics";
 function toParams(filters: LogFilters) {
   const params = new URLSearchParams({
     query: filters.query,
-    rangeMinutes: String(filters.rangeMinutes),
+    rf: filters.timeRange.rf,
+    rt: filters.timeRange.rt,
   });
 
   if (filters.levels.length) params.set("levels", filters.levels.join(","));

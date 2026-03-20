@@ -7,6 +7,8 @@ import {
 } from "@/lib/api/server";
 
 const DEFAULT_PAGE_SIZE = 200;
+const DEFAULT_RANGE_MINUTES = 60;
+const MICROSECONDS_IN_MILLISECOND = BigInt(1000);
 
 function parseCsv<T extends string>(
   value: string | null,
@@ -27,9 +29,50 @@ function isEnvironment(value: string): value is Log["environment"] {
   return value === "prod" || value === "staging" || value === "dev";
 }
 
+function parseLegacyIsoToMicros(value: string, field: string): bigint {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${field} must be a valid ISO datetime`);
+  }
+  return BigInt(date.getTime()) * MICROSECONDS_IN_MILLISECOND;
+}
+
+function parseCanonicalRange(params: URLSearchParams): { rf: string; rt: string } {
+  const rfRaw = params.get("rf");
+  const rtRaw = params.get("rt");
+  if ((rfRaw && !rtRaw) || (!rfRaw && rtRaw)) {
+    throw new Error("rf and rt must both be provided");
+  }
+  if (rfRaw && rtRaw) {
+    return { rf: rfRaw, rt: rtRaw };
+  }
+
+  const fromRaw = params.get("from");
+  const toRaw = params.get("to");
+  if (fromRaw || toRaw) {
+    const rt =
+      toRaw !== null
+        ? parseLegacyIsoToMicros(toRaw, "to")
+        : BigInt(Date.now()) * MICROSECONDS_IN_MILLISECOND;
+    const rf =
+      fromRaw !== null
+        ? parseLegacyIsoToMicros(fromRaw, "from")
+        : rt - BigInt(DEFAULT_RANGE_MINUTES * 60_000) * MICROSECONDS_IN_MILLISECOND;
+    return { rf: rf.toString(), rt: rt.toString() };
+  }
+
+  const rangeMinutes = Number(params.get("rangeMinutes") ?? DEFAULT_RANGE_MINUTES);
+  const safeMinutes = Number.isFinite(rangeMinutes)
+    ? Math.min(Math.max(Math.floor(rangeMinutes), 5), 24 * 60)
+    : DEFAULT_RANGE_MINUTES;
+  const rt = BigInt(Date.now()) * MICROSECONDS_IN_MILLISECOND;
+  const rf = rt - BigInt(safeMinutes * 60_000) * MICROSECONDS_IN_MILLISECOND;
+  // TODO(remove-legacy-range): drop rangeMinutes fallback after migration.
+  return { rf: rf.toString(), rt: rt.toString() };
+}
+
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const rangeMinutes = Number(params.get("rangeMinutes") ?? 60);
   const pageSize = Number(params.get("limit") ?? DEFAULT_PAGE_SIZE);
   const query = params.get("query")?.trim() ?? "";
   const levels = parseCsv(params.get("levels"), isLevel);
@@ -41,12 +84,21 @@ export async function GET(request: NextRequest) {
       .filter(Boolean) ?? [];
   const organizationId = getDefaultOrganizationId();
   const applicationId = getDefaultApplicationId();
-  const fromDate = new Date(Date.now() - rangeMinutes * 60_000).toISOString();
+  let canonicalRange: { rf: string; rt: string };
+  try {
+    canonicalRange = parseCanonicalRange(params);
+  } catch (error) {
+    return NextResponse.json(
+      { message: error instanceof Error ? error.message : "Invalid time range" },
+      { status: 400 },
+    );
+  }
 
   const backendParams = new URLSearchParams({
     organizationId,
     applicationId,
-    from: fromDate,
+    rf: canonicalRange.rf,
+    rt: canonicalRange.rt,
     limit: String(Number.isFinite(pageSize) ? Math.min(Math.max(pageSize, 50), 500) : 200),
   });
 

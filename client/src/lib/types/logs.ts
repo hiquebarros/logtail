@@ -10,12 +10,17 @@ export type Log = {
   metadata: Record<string, unknown>;
 };
 
+export type LogTimeRange = {
+  rf: string;
+  rt: string;
+};
+
 export type LogFilters = {
   query: string;
   levels: LogLevel[];
   services: string[];
   environments: Array<Log["environment"]>;
-  rangeMinutes: number;
+  timeRange: LogTimeRange;
 };
 
 export type LogsPageResponse = {

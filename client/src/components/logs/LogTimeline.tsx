@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { microsStringToMs, msToMicrosString } from "@/lib/utils/time-range";
 
 type TimelineLog = {
   timestamp: string;
@@ -15,9 +16,9 @@ type TimelineBucket = {
 
 type LogTimelineProps = {
   logs: TimelineLog[];
-  from: number;
-  to: number;
-  onRangeChange: (from: number, to: number) => void;
+  rf: string;
+  rt: string;
+  onRangeChange: (rf: string, rt: string) => void;
 };
 
 type EChartsModule = {
@@ -136,23 +137,30 @@ function loadECharts(): Promise<EChartsModule> {
   });
 }
 
-export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps) {
+export function LogTimeline({ logs, rf, rt, onRangeChange }: LogTimelineProps) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const instanceRef = useRef<EChartsInstance | null>(null);
   const bucketsRef = useRef<TimelineBucket[]>([]);
-  const fromRef = useRef(from);
-  const toRef = useRef(to);
+  const [fromMs, toMs] = useMemo(() => {
+    try {
+      return [microsStringToMs(rf), microsStringToMs(rt)] as const;
+    } catch {
+      return [0, 1_000] as const;
+    }
+  }, [rf, rt]);
+  const fromRef = useRef(fromMs);
+  const toRef = useRef(toMs);
   const bucketSizeRef = useRef(1000);
   const onRangeChangeRef = useRef(onRangeChange);
   const [cursorX, setCursorX] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const rangeMs = Math.max(to - from, 1000);
+  const rangeMs = Math.max(toMs - fromMs, 1000);
   const bucketSize = useMemo(() => getBucketSize(rangeMs), [rangeMs]);
   const buckets = useMemo(
-    () => aggregateBuckets(logs, from, to, bucketSize),
-    [logs, from, to, bucketSize]
+    () => aggregateBuckets(logs, fromMs, toMs, bucketSize),
+    [logs, fromMs, toMs, bucketSize]
   );
   const chartCounts = useMemo(() => buckets.map((bucket) => bucket.count), [buckets]);
   const maxBucketCount = useMemo(
@@ -170,11 +178,11 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
 
   useEffect(() => {
     bucketsRef.current = buckets;
-    fromRef.current = from;
-    toRef.current = to;
+    fromRef.current = fromMs;
+    toRef.current = toMs;
     bucketSizeRef.current = bucketSize;
     onRangeChangeRef.current = onRangeChange;
-  }, [buckets, bucketSize, from, onRangeChange, to]);
+  }, [buckets, bucketSize, fromMs, onRangeChange, toMs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,7 +236,7 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
             return;
           }
 
-          onRangeChangeRef.current(newFrom, newTo);
+          onRangeChangeRef.current(msToMicrosString(newFrom), msToMicrosString(newTo));
         });
 
         setIsReady(true);
@@ -315,7 +323,7 @@ export function LogTimeline({ logs, from, to, onRangeChange }: LogTimelineProps)
     return () => {
       window.removeEventListener("resize", onResize);
     };
-  }, [buckets, chartCounts, from, isReady, maxBucketCount, to]);
+  }, [buckets, chartCounts, fromMs, isReady, maxBucketCount, toMs]);
 
   if (loadError) {
     return (

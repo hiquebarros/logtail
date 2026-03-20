@@ -30,8 +30,11 @@ export type GetLogsFilters = {
 export type GetLogsQuery = {
   organizationId?: string;
   applicationId?: string;
+  rf?: string;
+  rt?: string;
   from?: string;
   to?: string;
+  rangeMinutes?: string;
   level?: string;
   search?: string;
   cursor?: string;

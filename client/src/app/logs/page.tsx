@@ -9,28 +9,35 @@ import { LogList } from "@/components/log-viewer/log-list";
 import { fetchLogsPage } from "@/lib/api/client";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import type { Log, LogFilters } from "@/lib/types/logs";
+import { buildRelativeTimeRange, microsStringToMs } from "@/lib/utils/time-range";
 
 const defaultFilters: LogFilters = {
   query: "",
   levels: [],
   services: [],
   environments: [],
-  rangeMinutes: 60,
+  timeRange: buildRelativeTimeRange(60),
 };
 
 export default function LogsPage() {
-  const initialNow = Date.now();
   const [filters, setFilters] = useState<LogFilters>(defaultFilters);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
   const [live, setLive] = useState(false);
   const [scrollToEndSignal, setScrollToEndSignal] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [from, setFrom] = useState<number>(
-    initialNow - defaultFilters.rangeMinutes * 60 * 1000
-  );
-  const [to, setTo] = useState<number>(initialNow);
   const debouncedQuery = useDebouncedValue(filters.query, 250);
+  const [rangeFromMs, rangeToMs] = useMemo(() => {
+    try {
+      return [
+        microsStringToMs(filters.timeRange.rf),
+        microsStringToMs(filters.timeRange.rt),
+      ] as const;
+    } catch {
+      const fallback = buildRelativeTimeRange(60);
+      return [microsStringToMs(fallback.rf), microsStringToMs(fallback.rt)] as const;
+    }
+  }, [filters.timeRange.rf, filters.timeRange.rt]);
 
   const stableFilters = useMemo(
     () => ({ ...filters, query: debouncedQuery }),
@@ -59,15 +66,10 @@ export default function LogsPage() {
     () =>
       logs.filter((log) => {
         const ts = new Date(log.timestamp).getTime();
-        return Number.isFinite(ts) && ts >= from && ts <= to;
+        return Number.isFinite(ts) && ts >= rangeFromMs && ts <= rangeToMs;
       }),
-    [from, logs, to]
+    [logs, rangeFromMs, rangeToMs]
   );
-
-  const availableServices = useMemo(() => {
-    const fromApi = logsQuery.data?.pages[0]?.availableServices ?? [];
-    return fromApi;
-  }, [logsQuery.data?.pages]);
 
   useEffect(() => {
     if (!live) return;
@@ -89,17 +91,10 @@ export default function LogsPage() {
     };
   }, [isAtBottom, live]);
 
-  useEffect(() => {
-    const now = Date.now();
-    setFrom(now - filters.rangeMinutes * 60 * 1000);
-    setTo(now);
-  }, [filters.rangeMinutes]);
-
   return (
     <main className="flex min-h-screen flex-col bg-zinc-950 text-zinc-100">
       <LogFiltersBar
         filters={filters}
-        services={availableServices}
         live={live}
         onLiveChange={(value) => {
           setLive(value);
@@ -115,11 +110,17 @@ export default function LogsPage() {
       <div className="border-b border-zinc-800 px-3 py-2">
         <LogTimeline
           logs={logs}
-          from={from}
-          to={to}
-          onRangeChange={(nextFrom, nextTo) => {
-            setFrom(nextFrom);
-            setTo(nextTo);
+          rf={filters.timeRange.rf}
+          rt={filters.timeRange.rt}
+          onRangeChange={(rf, rt) => {
+            setFilters((current) => ({
+              ...current,
+              timeRange: {
+                rf,
+                rt,
+              },
+            }));
+            setLiveLogs([]);
           }}
         />
       </div>

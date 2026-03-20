@@ -8,6 +8,9 @@ class RequestError extends Error {
         this.statusCode = statusCode;
     }
 }
+const MICROSECONDS_IN_MILLISECOND = BigInt(1000);
+const MIN_DATE_MS = BigInt("-8640000000000000");
+const MAX_DATE_MS = BigInt("8640000000000000");
 class LogsService {
     constructor(logsRepository) {
         this.logsRepository = logsRepository;
@@ -94,11 +97,7 @@ class LogsService {
         const query = input;
         const organizationId = this.requireString(query.organizationId, "organizationId is required");
         const applicationId = this.requireString(query.applicationId, "applicationId is required");
-        const from = this.parseOptionalDate(query.from, "from");
-        const to = this.parseOptionalDate(query.to, "to");
-        if (from && to && from > to) {
-            throw new RequestError("from must be less than or equal to to");
-        }
+        const { from, to } = this.parseQueryTimeRange(query);
         const level = this.parseOptionalNonEmptyString(query.level);
         const rawSearch = this.parseOptionalNonEmptyString(query.search);
         const parsedSearch = (0, logs_parser_1.parseLogSearch)(rawSearch ?? "");
@@ -118,6 +117,37 @@ class LogsService {
             cursor,
             limit
         };
+    }
+    parseQueryTimeRange(query) {
+        const hasCanonicalRange = query.rf !== undefined || query.rt !== undefined;
+        if (hasCanonicalRange) {
+            if (!query.rf || !query.rt) {
+                throw new RequestError("rf and rt must both be provided");
+            }
+            const from = this.parseMicrosecondsDate(query.rf, "rf");
+            const to = this.parseMicrosecondsDate(query.rt, "rt");
+            if (from > to) {
+                throw new RequestError("rf must be less than or equal to rt");
+            }
+            return { from, to };
+        }
+        const from = this.parseOptionalDate(query.from, "from");
+        const to = this.parseOptionalDate(query.to, "to");
+        if (from || to) {
+            if (from && to && from > to) {
+                throw new RequestError("from must be less than or equal to to");
+            }
+            // TODO(remove-legacy-range): remove ISO from/to fallback after migration window.
+            return { from, to };
+        }
+        if (query.rangeMinutes !== undefined) {
+            const rangeMinutes = this.parseLegacyRangeMinutes(query.rangeMinutes);
+            const toDate = new Date();
+            const fromDate = new Date(toDate.getTime() - rangeMinutes * 60000);
+            // TODO(remove-legacy-range): remove rangeMinutes fallback after migration window.
+            return { from: fromDate, to: toDate };
+        }
+        return {};
     }
     parseGetMetricsFilters(input) {
         const query = input;
@@ -199,6 +229,39 @@ class LogsService {
             throw new RequestError(`${fieldName} must be a valid datetime`);
         }
         return date;
+    }
+    parseMicrosecondsDate(value, fieldName) {
+        let micros;
+        try {
+            micros = BigInt(value);
+        }
+        catch {
+            throw new RequestError(`${fieldName} must be a numeric unix timestamp in microseconds`);
+        }
+        const millis = micros / MICROSECONDS_IN_MILLISECOND;
+        if (millis < MIN_DATE_MS || millis > MAX_DATE_MS) {
+            throw new RequestError(`${fieldName} is outside supported datetime bounds`);
+        }
+        const millisNumber = Number(millis);
+        if (!Number.isSafeInteger(millisNumber)) {
+            throw new RequestError(`${fieldName} is outside safe numeric bounds`);
+        }
+        const date = new Date(millisNumber);
+        if (Number.isNaN(date.getTime())) {
+            throw new RequestError(`${fieldName} must be a valid unix timestamp in microseconds`);
+        }
+        return date;
+    }
+    parseLegacyRangeMinutes(value) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) {
+            throw new RequestError("rangeMinutes must be a number");
+        }
+        const rounded = Math.floor(parsed);
+        if (rounded <= 0) {
+            throw new RequestError("rangeMinutes must be greater than 0");
+        }
+        return Math.min(rounded, 24 * 60);
     }
     parseRequiredDate(value, message) {
         const date = this.parseOptionalDate(value, "timestamp");

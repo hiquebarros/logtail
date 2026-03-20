@@ -1,10 +1,10 @@
 "use client";
 
-import type { Log, LogFilters, LogLevel } from "@/lib/types/logs";
+import type { LogFilters } from "@/lib/types/logs";
+import { buildRelativeTimeRange } from "@/lib/utils/time-range";
 
 type Props = {
   filters: LogFilters;
-  services: string[];
   live: boolean;
   onLiveChange: (value: boolean) => void;
   onChange: (next: LogFilters) => void;
@@ -17,22 +17,28 @@ const RANGE_OPTIONS = [
   { label: "24h", value: 24 * 60 },
 ];
 
-const LEVELS: LogLevel[] = ["info", "warn", "error"];
-const ENVIRONMENTS: Log["environment"][] = ["prod", "staging", "dev"];
-
-function toggleInArray<T>(array: T[], value: T): T[] {
-  return array.includes(value)
-    ? array.filter((item) => item !== value)
-    : [...array, value];
-}
+const ZERO_BIGINT = BigInt(0);
+const MICROSECONDS_IN_MINUTE = BigInt(60) * BigInt(1_000_000);
 
 export function LogFiltersBar({
   filters,
-  services,
   live,
   onLiveChange,
   onChange,
 }: Props) {
+  const selectedMinutes = (() => {
+    try {
+      const rf = BigInt(filters.timeRange.rf);
+      const rt = BigInt(filters.timeRange.rt);
+      const diff = rt - rf;
+      if (diff <= ZERO_BIGINT) return null;
+      if (diff % MICROSECONDS_IN_MINUTE !== ZERO_BIGINT) return null;
+      return Number(diff / MICROSECONDS_IN_MINUTE);
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <div className="space-y-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -47,9 +53,14 @@ export function LogFiltersBar({
             <button
               key={option.value}
               type="button"
-              onClick={() => onChange({ ...filters, rangeMinutes: option.value })}
+              onClick={() =>
+                onChange({
+                  ...filters,
+                  timeRange: buildRelativeTimeRange(option.value),
+                })
+              }
               className={`cursor-pointer rounded px-2.5 py-1 text-xs transition ${
-                filters.rangeMinutes === option.value
+                selectedMinutes === option.value
                   ? "bg-cyan-600 text-white"
                   : "text-zinc-300 hover:bg-zinc-800"
               }`}

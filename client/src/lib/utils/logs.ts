@@ -51,14 +51,28 @@ function isEnvironment(
   );
 }
 
+const MICROSECONDS_IN_MILLISECOND = BigInt(1000);
+
 export function filterLogs(logs: Log[], filters: LogFilters): Log[] {
-  const now = Date.now();
-  const rangeStart = now - filters.rangeMinutes * 60_000;
+  const rangeStart = (() => {
+    try {
+      return Number(BigInt(filters.timeRange.rf) / MICROSECONDS_IN_MILLISECOND);
+    } catch {
+      return Number.NEGATIVE_INFINITY;
+    }
+  })();
+  const rangeEnd = (() => {
+    try {
+      return Number(BigInt(filters.timeRange.rt) / MICROSECONDS_IN_MILLISECOND);
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  })();
   const parsed = parseQuery(filters.query);
 
   return logs.filter((log) => {
     const timestamp = new Date(log.timestamp).getTime();
-    if (timestamp < rangeStart || timestamp > now + 1_000) {
+    if (timestamp < rangeStart || timestamp > rangeEnd) {
       return false;
     }
 

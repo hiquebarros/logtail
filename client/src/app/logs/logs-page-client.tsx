@@ -1,7 +1,7 @@
 "use client";
 
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LogFiltersBar } from "@/components/filters/log-filters-bar";
 import { LogTimeline } from "@/components/logs/LogTimeline";
@@ -112,8 +112,10 @@ export function LogsPageClient() {
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
   const [live, setLive] = useState(false);
-  const [scrollToEndSignal, setScrollToEndSignal] = useState(0);
-  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [scrollToStartSignal, setScrollToStartSignal] = useState(0);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const isAtTopRef = useRef(isAtTop);
+  const lastAutoScrollAtRef = useRef(0);
   const currentUrlParams = searchParams.toString();
   const filtersParams = useMemo(() => buildFiltersParams(filters), [filters]);
   const filtersParamsString = filtersParams.toString();
@@ -165,15 +167,20 @@ export function LogsPageClient() {
     [logsQuery.data?.pages],
   );
 
-  const logs = useMemo(() => [...baseLogs, ...liveLogs], [baseLogs, liveLogs]);
+  const logs = useMemo(() => [...liveLogs, ...baseLogs], [baseLogs, liveLogs]);
+  const effectiveRangeToMs = live ? Date.now() : rangeToMs;
   const visibleLogs = useMemo(
     () =>
       logs.filter((log) => {
         const ts = new Date(log.timestamp).getTime();
-        return Number.isFinite(ts) && ts >= rangeFromMs && ts <= rangeToMs;
+        return Number.isFinite(ts) && ts >= rangeFromMs && ts <= effectiveRangeToMs;
       }),
-    [logs, rangeFromMs, rangeToMs],
+    [effectiveRangeToMs, logs, rangeFromMs],
   );
+
+  useEffect(() => {
+    isAtTopRef.current = isAtTop;
+  }, [isAtTop]);
 
   useEffect(() => {
     if (!live) return;
@@ -182,18 +189,23 @@ export function LogsPageClient() {
     eventSource.addEventListener("log", (event) => {
       const next = JSON.parse((event as MessageEvent).data) as Log;
       setLiveLogs((current) => {
-        const merged = [...current, next];
-        return merged.length > 1000 ? merged.slice(-1000) : merged;
+        const merged = [next, ...current];
+        return merged.length > 1000 ? merged.slice(0, 1000) : merged;
       });
-      if (isAtBottom) {
-        setScrollToEndSignal((value) => value + 1);
+      // Auto-scroll only when already following newest items at the top.
+      if (isAtTopRef.current) {
+        const now = Date.now();
+        if (now - lastAutoScrollAtRef.current >= 200) {
+          lastAutoScrollAtRef.current = now;
+          setScrollToStartSignal((value) => value + 1);
+        }
       }
     });
 
     return () => {
       eventSource.close();
     };
-  }, [isAtBottom, live]);
+  }, [live]);
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
@@ -278,12 +290,12 @@ export function LogsPageClient() {
               <LogList
                 logs={visibleLogs}
                 selectedLogId={selectedLog?.id ?? null}
-                hasMore={Boolean(logsQuery.hasNextPage)}
+                hasMore={Boolean(logsQuery.hasNextPage) && !live}
                 isFetchingNextPage={logsQuery.isFetchingNextPage}
-                scrollToEndSignal={scrollToEndSignal}
+                scrollToStartSignal={scrollToStartSignal}
                 onReachEnd={handleReachEnd}
                 onSelectLog={setSelectedLog}
-                onScrollStateChange={setIsAtBottom}
+                onScrollStateChange={setIsAtTop}
               />
             </div>
           )}

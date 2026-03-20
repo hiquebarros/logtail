@@ -10,10 +10,10 @@ type Props = {
   selectedLogId: string | null;
   hasMore: boolean;
   isFetchingNextPage: boolean;
-  scrollToEndSignal: number;
+  scrollToStartSignal: number;
   onReachEnd: () => void;
   onSelectLog: (log: Log) => void;
-  onScrollStateChange: (isAtBottom: boolean) => void;
+  onScrollStateChange: (isAtTop: boolean) => void;
 };
 
 const ROW_HEIGHT = 40;
@@ -23,7 +23,7 @@ export function LogList({
   selectedLogId,
   hasMore,
   isFetchingNextPage,
-  scrollToEndSignal,
+  scrollToStartSignal,
   onReachEnd,
   onSelectLog,
   onScrollStateChange,
@@ -50,8 +50,8 @@ export function LogList({
       return;
     }
 
-    parentRef.current.scrollTop = parentRef.current.scrollHeight;
-  }, [scrollToEndSignal]);
+    parentRef.current.scrollTop = 0;
+  }, [scrollToStartSignal]);
 
   return (
     <div
@@ -59,9 +59,10 @@ export function LogList({
       className="h-full overflow-y-auto overscroll-contain"
       onScroll={(event) => {
         const target = event.currentTarget;
+        const isAtTop = target.scrollTop < 100;
         const isAtBottom =
           target.scrollHeight - target.scrollTop - target.clientHeight < 100;
-        onScrollStateChange(isAtBottom);
+        onScrollStateChange(isAtTop);
 
         if (!isAtBottom || !hasMore || isFetchingNextPage) return;
 
@@ -83,6 +84,9 @@ export function LogList({
         >
           {virtualRows.map((row) => {
             const log = data[row.index];
+            if (!log) {
+              return null;
+            }
             return (
               <div key={row.key} data-index={row.index} ref={rowVirtualizer.measureElement}>
                 <LogRow

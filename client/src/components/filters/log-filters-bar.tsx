@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { LogFilters } from "@/lib/types/logs";
 import { buildRelativeTimeRange } from "@/lib/utils/time-range";
 
@@ -31,6 +32,16 @@ export function LogFiltersBar({
   onLiveChange,
   onChange,
 }: Props) {
+  const [draftQuery, setDraftQuery] = useState(filters.query);
+
+  useEffect(() => {
+    setDraftQuery(filters.query);
+  }, [filters.query]);
+
+  const applySearch = () => {
+    onChange({ ...filters, query: draftQuery.trim() });
+  };
+
   const selectedRangeValue = (() => {
     try {
       const rf = BigInt(filters.timeRange.rf);
@@ -51,11 +62,24 @@ export function LogFiltersBar({
     <div className="space-y-3 border-b border-zinc-800 bg-zinc-950 px-4 py-3">
       <div className="flex flex-wrap items-center gap-2">
         <input
-          value={filters.query}
-          onChange={(event) => onChange({ ...filters, query: event.target.value })}
+          value={draftQuery}
+          onChange={(event) => setDraftQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              applySearch();
+            }
+          }}
           placeholder="Search logs (e.g. level:error service:api timeout)"
           className="h-9 min-w-[320px] flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none ring-cyan-500 transition focus:ring-2"
         />
+        <button
+          type="button"
+          onClick={applySearch}
+          className="h-9 cursor-pointer rounded-md border border-cyan-500/50 bg-cyan-600/20 px-3 text-sm font-medium text-cyan-200 transition hover:bg-cyan-600/30"
+        >
+          Search
+        </button>
         <select
           value={selectedRangeValue}
           onChange={(event) => {

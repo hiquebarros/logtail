@@ -9,7 +9,6 @@ import { LogDetailsPanel } from "@/components/log-viewer/log-details-panel";
 import { LogEmptyState } from "@/components/log-viewer/log-empty-state";
 import { LogList } from "@/components/log-viewer/log-list";
 import { fetchLogsPage } from "@/lib/api/client";
-import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import type { Log, LogFilters, LogLevel } from "@/lib/types/logs";
 import { buildRelativeTimeRange, microsStringToMs, nowMicros } from "@/lib/utils/time-range";
 
@@ -119,7 +118,6 @@ export function LogsPageClient() {
   const currentUrlParams = searchParams.toString();
   const filtersParams = useMemo(() => buildFiltersParams(filters), [filters]);
   const filtersParamsString = filtersParams.toString();
-  const debouncedQuery = useDebouncedValue(filters.query, 250);
   const [rangeFromMs, rangeToMs] = useMemo(() => {
     try {
       return [
@@ -132,11 +130,6 @@ export function LogsPageClient() {
     }
   }, [filters.timeRange.rf, filters.timeRange.rt]);
 
-  const stableFilters = useMemo(
-    () => ({ ...filters, query: debouncedQuery }),
-    [debouncedQuery, filters],
-  );
-
   useEffect(() => {
     if (currentUrlParams === filtersParamsString) {
       return;
@@ -146,10 +139,10 @@ export function LogsPageClient() {
   }, [currentUrlParams, filtersParamsString, pathname, router]);
 
   const logsQuery = useInfiniteQuery({
-    queryKey: ["logs", stableFilters],
+    queryKey: ["logs", filters],
     queryFn: ({ pageParam }) =>
       fetchLogsPage({
-        filters: stableFilters,
+        filters,
         pageParam,
         limit: 100,
       }),
@@ -225,7 +218,7 @@ export function LogsPageClient() {
       />
       <div className="border-b border-zinc-800 px-3 py-2">
         <LogTimeline
-          filters={stableFilters}
+          filters={filters}
           onRangeChange={(rf, rt) => {
             setFilters((current) => ({
               ...current,

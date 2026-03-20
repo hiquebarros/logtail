@@ -11,10 +11,15 @@ type Props = {
 };
 
 const RANGE_OPTIONS = [
-  { label: "5m", value: 5 },
-  { label: "1h", value: 60 },
-  { label: "12h", value: 12 * 60 },
-  { label: "24h", value: 24 * 60 },
+  { label: "Last 5 minutes", value: "5m", minutes: 5 },
+  { label: "Last 15 minutes", value: "15m", minutes: 15 },
+  { label: "Last 1 hour", value: "1h", minutes: 60 },
+  { label: "Last 2 hours", value: "2h", minutes: 2 * 60 },
+  { label: "Last 6 hours", value: "6h", minutes: 6 * 60 },
+  { label: "Last 12 hours", value: "12h", minutes: 12 * 60 },
+  { label: "Last 24 hours", value: "24h", minutes: 24 * 60 },
+  { label: "Last 7 days", value: "7d", minutes: 7 * 24 * 60 },
+  { label: "Last 30 days", value: "30d", minutes: 30 * 24 * 60 },
 ];
 
 const ZERO_BIGINT = BigInt(0);
@@ -26,16 +31,19 @@ export function LogFiltersBar({
   onLiveChange,
   onChange,
 }: Props) {
-  const selectedMinutes = (() => {
+  const selectedRangeValue = (() => {
     try {
       const rf = BigInt(filters.timeRange.rf);
       const rt = BigInt(filters.timeRange.rt);
       const diff = rt - rf;
-      if (diff <= ZERO_BIGINT) return null;
-      if (diff % MICROSECONDS_IN_MINUTE !== ZERO_BIGINT) return null;
-      return Number(diff / MICROSECONDS_IN_MINUTE);
+      if (diff <= ZERO_BIGINT || diff % MICROSECONDS_IN_MINUTE !== ZERO_BIGINT) {
+        return "";
+      }
+      const minutes = Number(diff / MICROSECONDS_IN_MINUTE);
+      const matched = RANGE_OPTIONS.find((option) => option.minutes === minutes);
+      return matched?.value ?? "";
     } catch {
-      return null;
+      return "";
     }
   })();
 
@@ -48,27 +56,24 @@ export function LogFiltersBar({
           placeholder="Search logs (e.g. level:error service:api timeout)"
           className="h-9 min-w-[320px] flex-1 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none ring-cyan-500 transition focus:ring-2"
         />
-        <div className="inline-flex rounded-md border border-zinc-700 bg-zinc-900 p-1">
+        <select
+          value={selectedRangeValue}
+          onChange={(event) => {
+            const selected = RANGE_OPTIONS.find((option) => option.value === event.target.value);
+            if (!selected) return;
+            onChange({
+              ...filters,
+              timeRange: buildRelativeTimeRange(selected.minutes),
+            });
+          }}
+          className="h-9 min-w-[170px] rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100 outline-none ring-cyan-500 transition focus:ring-2"
+        >
           {RANGE_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() =>
-                onChange({
-                  ...filters,
-                  timeRange: buildRelativeTimeRange(option.value),
-                })
-              }
-              className={`cursor-pointer rounded px-2.5 py-1 text-xs transition ${
-                selectedMinutes === option.value
-                  ? "bg-cyan-600 text-white"
-                  : "text-zinc-300 hover:bg-zinc-800"
-              }`}
-            >
+            <option key={option.value} value={option.value}>
               {option.label}
-            </button>
+            </option>
           ))}
-        </div>
+        </select>
         <button
           type="button"
           onClick={() => onLiveChange(!live)}

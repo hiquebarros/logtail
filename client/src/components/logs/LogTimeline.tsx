@@ -63,6 +63,27 @@ function formatBucketSize(bucketSizeMs: number): string {
   return `${Math.max(1, Math.round(bucketSizeMs / (24 * 60 * 60_000)))}d`;
 }
 
+function formatAxisTimestamp(ts: number, bucketSizeMs: number, rangeMs: number): string {
+  const date = new Date(ts);
+  if (!Number.isFinite(date.getTime())) {
+    return "";
+  }
+
+  if (bucketSizeMs < 60_000) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+  if (bucketSizeMs < 24 * 60 * 60_000) {
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  const showYear = rangeMs > 365 * 24 * 60 * 60_000;
+  return date.toLocaleDateString([], {
+    month: "short",
+    day: "2-digit",
+    ...(showYear ? { year: "numeric" as const } : {}),
+  });
+}
+
 function densifyBuckets(input: {
   sparseBuckets: LogHistogramBucket[];
   fromMs: number;
@@ -72,8 +93,11 @@ function densifyBuckets(input: {
   const safeBucketSize = Math.max(input.bucketSizeMs, MIN_BUCKET_MS);
   const safeFrom = Math.min(input.fromMs, input.toMs);
   const safeTo = Math.max(input.fromMs, input.toMs);
-  const start = floorToBucket(safeFrom, safeBucketSize);
   const end = floorToBucket(safeTo, safeBucketSize);
+  const requestedStart = floorToBucket(safeFrom, safeBucketSize);
+  const maxRangeSpan = safeBucketSize * (MAX_CLIENT_BUCKETS - 1);
+  const clampedStart = Math.max(requestedStart, end - maxRangeSpan);
+  const start = floorToBucket(clampedStart, safeBucketSize);
   const sparseMap = new Map<number, number>();
 
   for (const bucket of input.sparseBuckets) {
@@ -270,11 +294,12 @@ export function LogTimeline({ filters, onRangeChange }: LogTimelineProps) {
     if (!instance || !isReady) {
       return;
     }
+    const rangeMs = Math.max(0, toMs - fromMs);
 
     instance.setOption(
       {
         animation: false,
-        grid: { left: 6, right: 6, top: 8, bottom: 8 },
+        grid: { left: 6, right: 6, top: 8, bottom: 22 },
         tooltip: {
           trigger: "item",
           formatter: (item: { dataIndex?: number; value?: [number, number] | number }) => {
@@ -294,9 +319,15 @@ export function LogTimeline({ filters, onRangeChange }: LogTimelineProps) {
         },
         xAxis: {
           type: "time",
-          axisLabel: { show: false },
+          axisLabel: {
+            show: true,
+            color: "#71717a",
+            fontSize: 10,
+            hideOverlap: true,
+            formatter: (value: number) => formatAxisTimestamp(value, bucketSize, rangeMs),
+          },
           axisTick: { show: false },
-          axisLine: { show: false },
+          axisLine: { show: true, lineStyle: { color: "#3f3f46" } },
           splitLine: { show: false }
         },
         yAxis: {
@@ -334,7 +365,7 @@ export function LogTimeline({ filters, onRangeChange }: LogTimelineProps) {
     return () => {
       window.removeEventListener("resize", onResize);
     };
-  }, [buckets, chartPoints, isReady, maxBucketCount]);
+  }, [bucketSize, buckets, chartPoints, fromMs, isReady, maxBucketCount, toMs]);
 
   if (loadError || histogramQuery.isError) {
     return (

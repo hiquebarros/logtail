@@ -19,7 +19,7 @@ function buildDefaultFilters(): LogFilters {
     levels: [],
     services: [],
     environments: [],
-    timeRange: buildRelativeTimeRange(60),
+    timeRange: buildRelativeTimeRange(120),
   };
 }
 
@@ -125,7 +125,7 @@ export function LogsPageClient() {
         microsStringToMs(filters.timeRange.rt),
       ] as const;
     } catch {
-      const fallback = buildRelativeTimeRange(60);
+      const fallback = buildRelativeTimeRange(120);
       return [microsStringToMs(fallback.rf), microsStringToMs(fallback.rt)] as const;
     }
   }, [filters.timeRange.rf, filters.timeRange.rt]);

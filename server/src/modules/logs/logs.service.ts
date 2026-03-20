@@ -32,8 +32,23 @@ const MIN_DATE_MS = BigInt("-8640000000000000");
 const MAX_DATE_MS = BigInt("8640000000000000");
 const DEFAULT_HISTOGRAM_BUCKET_MS = 10 * 60 * 1000;
 const MAX_HISTOGRAM_BUCKETS = 1500;
+const TARGET_HISTOGRAM_BUCKETS = 160;
 const MIN_BUCKET_MS = 1000;
-const MAX_BUCKET_MS = 24 * 60 * 60 * 1000;
+const MAX_BUCKET_MS = 30 * 24 * 60 * 60 * 1000;
+const HISTOGRAM_BUCKET_LADDER_MS = [
+  60 * 1000, // 1m
+  5 * 60 * 1000, // 5m
+  15 * 60 * 1000, // 15m
+  30 * 60 * 1000, // 30m
+  60 * 60 * 1000, // 1h
+  3 * 60 * 60 * 1000, // 3h
+  6 * 60 * 60 * 1000, // 6h
+  12 * 60 * 60 * 1000, // 12h
+  24 * 60 * 60 * 1000, // 1d
+  7 * 24 * 60 * 60 * 1000, // 7d
+  14 * 24 * 60 * 60 * 1000, // 14d
+  30 * 24 * 60 * 60 * 1000 // 30d
+];
 
 export class LogsService {
   constructor(private readonly logsRepository: LogsRepository) {}
@@ -531,14 +546,22 @@ export class LogsService {
   private normalizeBucketSize(bucketSizeMs: number, rangeMs: number): number {
     const safeRange = Math.max(rangeMs, MIN_BUCKET_MS);
     const safeBucket = Math.min(Math.max(bucketSizeMs, MIN_BUCKET_MS), MAX_BUCKET_MS);
-    const bucketCount = Math.ceil(safeRange / safeBucket);
+    const minimumForHardCap = Math.ceil(safeRange / MAX_HISTOGRAM_BUCKETS);
+    const minimumForTargetDensity = Math.ceil(safeRange / TARGET_HISTOGRAM_BUCKETS);
+    const minimumRequired = Math.max(
+      MIN_BUCKET_MS,
+      minimumForHardCap,
+      minimumForTargetDensity
+    );
+    const requestedOrRequired = Math.max(safeBucket, minimumRequired);
 
-    if (bucketCount <= MAX_HISTOGRAM_BUCKETS) {
-      return safeBucket;
+    for (const candidate of HISTOGRAM_BUCKET_LADDER_MS) {
+      if (candidate >= requestedOrRequired) {
+        return candidate;
+      }
     }
 
-    const scaled = Math.ceil(safeRange / MAX_HISTOGRAM_BUCKETS);
-    return Math.min(MAX_BUCKET_MS, Math.max(MIN_BUCKET_MS, Math.ceil(scaled / 1000) * 1000));
+    return MAX_BUCKET_MS;
   }
 
   private requireString(value: string | undefined, message: string): string {

@@ -2,30 +2,117 @@
 
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LogFiltersBar } from "@/components/filters/log-filters-bar";
 import { LogTimeline } from "@/components/logs/LogTimeline";
 import { LogDetailsPanel } from "@/components/log-viewer/log-details-panel";
 import { LogList } from "@/components/log-viewer/log-list";
 import { fetchLogsPage } from "@/lib/api/client";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
-import type { Log, LogFilters } from "@/lib/types/logs";
+import type { Log, LogFilters, LogLevel } from "@/lib/types/logs";
 import { buildRelativeTimeRange, microsStringToMs } from "@/lib/utils/time-range";
 
-const defaultFilters: LogFilters = {
-  query: "",
-  levels: [],
-  services: [],
-  environments: [],
-  timeRange: buildRelativeTimeRange(60),
-};
+function buildDefaultFilters(): LogFilters {
+  return {
+    query: "",
+    levels: [],
+    services: [],
+    environments: [],
+    timeRange: buildRelativeTimeRange(60),
+  };
+}
+
+function isLogLevel(value: string): value is LogLevel {
+  return value === "info" || value === "warn" || value === "error";
+}
+
+function isEnvironment(value: string): value is Log["environment"] {
+  return value === "prod" || value === "staging" || value === "dev";
+}
+
+function parseCsv<T extends string>(
+  raw: string | null,
+  validator: (value: string) => value is T,
+): T[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(validator);
+}
+
+function parseTimeRangeFromParams(params: URLSearchParams): LogFilters["timeRange"] {
+  const rf = params.get("rf");
+  const rt = params.get("rt");
+  if (!rf || !rt) {
+    return buildDefaultFilters().timeRange;
+  }
+
+  try {
+    const rfUs = BigInt(rf);
+    const rtUs = BigInt(rt);
+    if (rfUs > rtUs) {
+      return buildDefaultFilters().timeRange;
+    }
+    return { rf: rfUs.toString(), rt: rtUs.toString() };
+  } catch {
+    return buildDefaultFilters().timeRange;
+  }
+}
+
+function parseFiltersFromParams(params: URLSearchParams): LogFilters {
+  return {
+    query: params.get("query")?.trim() ?? "",
+    levels: parseCsv(params.get("levels"), isLogLevel),
+    services:
+      params
+        .get("services")
+        ?.split(",")
+        .map((service) => service.trim())
+        .filter(Boolean) ?? [],
+    environments: parseCsv(params.get("environments"), isEnvironment),
+    timeRange: parseTimeRangeFromParams(params),
+  };
+}
+
+function buildFiltersParams(filters: LogFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("rf", filters.timeRange.rf);
+  params.set("rt", filters.timeRange.rt);
+
+  if (filters.query.trim().length > 0) {
+    params.set("query", filters.query.trim());
+  }
+  if (filters.levels.length > 0) {
+    params.set("levels", filters.levels.join(","));
+  }
+  if (filters.services.length > 0) {
+    params.set("services", filters.services.join(","));
+  }
+  if (filters.environments.length > 0) {
+    params.set("environments", filters.environments.join(","));
+  }
+
+  return params;
+}
 
 export default function LogsPage() {
-  const [filters, setFilters] = useState<LogFilters>(defaultFilters);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialFilters = useMemo(
+    () => parseFiltersFromParams(new URLSearchParams(searchParams.toString())),
+    [searchParams],
+  );
+  const [filters, setFilters] = useState<LogFilters>(initialFilters);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
   const [live, setLive] = useState(false);
   const [scrollToEndSignal, setScrollToEndSignal] = useState(0);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const currentUrlParams = searchParams.toString();
+  const filtersParams = useMemo(() => buildFiltersParams(filters), [filters]);
+  const filtersParamsString = filtersParams.toString();
   const debouncedQuery = useDebouncedValue(filters.query, 250);
   const [rangeFromMs, rangeToMs] = useMemo(() => {
     try {
@@ -43,6 +130,14 @@ export default function LogsPage() {
     () => ({ ...filters, query: debouncedQuery }),
     [debouncedQuery, filters],
   );
+
+  useEffect(() => {
+    if (currentUrlParams === filtersParamsString) {
+      return;
+    }
+    const nextUrl = `${pathname}?${filtersParamsString}`;
+    router.replace(nextUrl, { scroll: false });
+  }, [currentUrlParams, filtersParamsString, pathname, router]);
 
   const logsQuery = useInfiniteQuery({
     queryKey: ["logs", stableFilters],

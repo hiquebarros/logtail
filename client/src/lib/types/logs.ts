@@ -30,3 +30,14 @@ export type LogsPageResponse = {
   total: number;
   availableServices: string[];
 };
+
+export type LogHistogramBucket = {
+  ts: number;
+  count: number;
+};
+
+export type LogHistogramResponse = {
+  buckets: LogHistogramBucket[];
+  bucketSizeMs: number;
+  totalInRange: number;
+};

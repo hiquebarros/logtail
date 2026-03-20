@@ -66,5 +66,7 @@ model Log {
   @@index([applicationId], map: "logs_application_id_idx")
   @@index([organizationId, timestamp], map: "logs_organization_timestamp_idx")
   @@index([applicationId, timestamp], map: "logs_application_timestamp_idx")
+  @@index([organizationId, applicationId, timestamp, id], map: "logs_org_app_timestamp_id_idx")
+  @@index([organizationId, applicationId, level, timestamp], map: "logs_org_app_level_timestamp_idx")
   @@map("logs")
 }

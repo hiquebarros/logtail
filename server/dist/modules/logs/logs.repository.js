@@ -9,8 +9,8 @@ class LogsRepository {
             organizationId: params.organizationId,
             applicationId: params.applicationId
         };
-        if (params.level) {
-            baseWhere.level = params.level;
+        if (params.levels.length > 0) {
+            baseWhere.level = { in: params.levels };
         }
         if (params.search) {
             baseWhere.message = {
@@ -18,11 +18,41 @@ class LogsRepository {
                 mode: "insensitive"
             };
         }
-        if (params.service) {
-            baseWhere.metadata = {
-                path: ["service"],
-                equals: params.service
-            };
+        if (params.services.length > 0) {
+            const existingAnd = Array.isArray(baseWhere.AND)
+                ? baseWhere.AND
+                : baseWhere.AND
+                    ? [baseWhere.AND]
+                    : [];
+            baseWhere.AND = [
+                ...existingAnd,
+                {
+                    OR: params.services.map((service) => ({
+                        metadata: {
+                            path: ["service"],
+                            equals: service
+                        }
+                    }))
+                }
+            ];
+        }
+        if (params.environments.length > 0) {
+            const existingAnd = Array.isArray(baseWhere.AND)
+                ? baseWhere.AND
+                : baseWhere.AND
+                    ? [baseWhere.AND]
+                    : [];
+            baseWhere.AND = [
+                ...existingAnd,
+                {
+                    OR: params.environments.map((environment) => ({
+                        metadata: {
+                            path: ["env"],
+                            equals: environment
+                        }
+                    }))
+                }
+            ];
         }
         if (params.from || params.to) {
             baseWhere.timestamp = {};
@@ -56,6 +86,42 @@ class LogsRepository {
             orderBy: [{ timestamp: "desc" }, { id: "desc" }],
             take: params.limit + 1
         });
+    }
+    async getHistogram(params, bucketSizeMs) {
+        const whereClauses = [
+            client_1.Prisma.sql `"organization_id" = ${params.organizationId}::uuid`,
+            client_1.Prisma.sql `"application_id" = ${params.applicationId}::uuid`,
+            client_1.Prisma.sql `"timestamp" >= ${params.from}`,
+            client_1.Prisma.sql `"timestamp" <= ${params.to}`
+        ];
+        if (params.levels.length > 0) {
+            whereClauses.push(client_1.Prisma.sql `"level" IN (${client_1.Prisma.join(params.levels)})`);
+        }
+        if (params.services.length > 0) {
+            whereClauses.push(client_1.Prisma.sql `COALESCE("metadata"->>'service', 'unknown') IN (${client_1.Prisma.join(params.services)})`);
+        }
+        if (params.environments.length > 0) {
+            whereClauses.push(client_1.Prisma.sql `COALESCE("metadata"->>'env', 'prod') IN (${client_1.Prisma.join(params.environments)})`);
+        }
+        if (params.search) {
+            whereClauses.push(client_1.Prisma.sql `"message" ILIKE ${`%${params.search}%`}`);
+        }
+        const whereSql = client_1.Prisma.join(whereClauses, " AND ");
+        const rows = await client_2.prisma.$queryRaw(client_1.Prisma.sql `
+      SELECT
+        (
+          FLOOR((EXTRACT(EPOCH FROM "timestamp") * 1000) / ${bucketSizeMs})::bigint * ${bucketSizeMs}
+        ) AS "ts",
+        COUNT(*)::bigint AS "count"
+      FROM "logs"
+      WHERE ${whereSql}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `);
+        return rows.map((row) => ({
+            ts: Number(row.ts),
+            count: Number(row.count)
+        }));
     }
     async createBatch(organizationId, applicationId, logs) {
         const result = await client_2.prisma.log.createMany({

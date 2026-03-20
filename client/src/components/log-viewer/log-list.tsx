@@ -29,6 +29,8 @@ export function LogList({
   onScrollStateChange,
 }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const hasMountedRef = useRef(false);
+  const lastRequestedKeyRef = useRef<string | null>(null);
   const data = useMemo(() => logs, [logs]);
 
   const rowVirtualizer = useVirtualizer({
@@ -41,16 +43,13 @@ export function LogList({
   const virtualRows = rowVirtualizer.getVirtualItems();
 
   useEffect(() => {
-    const lastItem = virtualRows[virtualRows.length - 1];
-    if (!lastItem) return;
-
-    if (lastItem.index >= data.length - 15 && hasMore && !isFetchingNextPage) {
-      onReachEnd();
-    }
-  }, [data.length, hasMore, isFetchingNextPage, onReachEnd, virtualRows]);
-
-  useEffect(() => {
     if (!parentRef.current) return;
+
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
+
     parentRef.current.scrollTop = parentRef.current.scrollHeight;
   }, [scrollToEndSignal]);
 
@@ -63,6 +62,15 @@ export function LogList({
         const isAtBottom =
           target.scrollHeight - target.scrollTop - target.clientHeight < 100;
         onScrollStateChange(isAtBottom);
+
+        if (!isAtBottom || !hasMore || isFetchingNextPage) return;
+
+        const lastLogId = data[data.length - 1]?.id ?? "";
+        const requestKey = `${data.length}:${lastLogId}`;
+        if (lastRequestedKeyRef.current === requestKey) return;
+
+        lastRequestedKeyRef.current = requestKey;
+        onReachEnd();
       }}
     >
       <div

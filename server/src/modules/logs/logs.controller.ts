@@ -14,6 +14,14 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
   );
 
   app.get(
+    "/logs/histogram",
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const result = await logsService.getHistogram(request.query);
+      reply.send(result);
+    }
+  );
+
+  app.get(
     "/metrics",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       const result = await logsService.getMetrics(request.query);

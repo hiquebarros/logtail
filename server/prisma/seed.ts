@@ -111,7 +111,7 @@ function generateLevel(): (typeof LOG_LEVELS)[number] {
 }
 
 function generateTimestamp(baseDate: Date): Date {
-  const daysBack = randomInt(0, 29);
+  const daysBack = randomInt(0, 2);
   const minutesBack = randomInt(0, 24 * 60 - 1);
   const secondsBack = randomInt(0, 59);
   const timestamp = new Date(baseDate);

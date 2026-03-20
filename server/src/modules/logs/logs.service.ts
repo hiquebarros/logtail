@@ -3,10 +3,13 @@ import { parseLogSearch } from "./logs.parser";
 import {
   CreateLogInput,
   CreateLogsBatchRequest,
+  GetHistogramFilters,
+  GetHistogramQuery,
   GetMetricsFilters,
   GetMetricsQuery,
   GetLogsFilters,
   GetLogsQuery,
+  HistogramResponse,
   LogItem,
   LogsCursor,
   LogsPage,
@@ -27,6 +30,10 @@ class RequestError extends Error {
 const MICROSECONDS_IN_MILLISECOND = BigInt(1000);
 const MIN_DATE_MS = BigInt("-8640000000000000");
 const MAX_DATE_MS = BigInt("8640000000000000");
+const DEFAULT_HISTOGRAM_BUCKET_MS = 10 * 60 * 1000;
+const MAX_HISTOGRAM_BUCKETS = 1500;
+const MIN_BUCKET_MS = 1000;
+const MAX_BUCKET_MS = 24 * 60 * 60 * 1000;
 
 export class LogsService {
   constructor(private readonly logsRepository: LogsRepository) {}
@@ -55,6 +62,23 @@ export class LogsService {
       : null;
 
     return { data, nextCursor };
+  }
+
+  async getHistogram(query: unknown): Promise<HistogramResponse> {
+    const filters = this.parseGetHistogramFilters(query);
+    const rangeMs = Math.max(filters.to.getTime() - filters.from.getTime(), MIN_BUCKET_MS);
+    const bucketSizeMs = this.normalizeBucketSize(
+      filters.bucketSizeMs ?? DEFAULT_HISTOGRAM_BUCKET_MS,
+      rangeMs
+    );
+    const buckets = await this.logsRepository.getHistogram(filters, bucketSizeMs);
+    const totalInRange = buckets.reduce((sum, bucket) => sum + bucket.count, 0);
+
+    return {
+      buckets,
+      bucketSizeMs,
+      totalInRange
+    };
   }
 
   async createLogsBatch(body: unknown): Promise<{ insertedCount: number }> {
@@ -169,25 +193,65 @@ export class LogsService {
 
     const { from, to } = this.parseQueryTimeRange(query);
 
-    const level = this.parseOptionalNonEmptyString(query.level);
+    const explicitLevels = this.parseCsv(query.levels);
+    const legacyLevel = this.parseOptionalNonEmptyString(query.level);
     const rawSearch = this.parseOptionalNonEmptyString(query.search);
     const parsedSearch = parseLogSearch(rawSearch ?? "");
-    const service = parsedSearch.filters.service;
     const search = parsedSearch.text || undefined;
+    const explicitServices = this.parseCsv(query.services);
+    const explicitEnvironments = this.parseCsv(query.environments);
+    const levelFromSearch = parsedSearch.filters.level;
+    const serviceFromSearch = parsedSearch.filters.service;
     const cursor = this.parseCursor(query.cursor);
     const limit = this.parseLimit(query.limit);
-    const parsedLevel = parsedSearch.filters.level;
+    const levels = this.toUnique(
+      [
+        ...explicitLevels,
+        ...(legacyLevel ? [legacyLevel] : []),
+        ...(levelFromSearch ? [levelFromSearch] : [])
+      ],
+      this.normalizeValue
+    );
+    const services = this.toUnique(
+      [...explicitServices, ...(serviceFromSearch ? [serviceFromSearch] : [])],
+      this.normalizeValue
+    );
+    const environments = this.toUnique(explicitEnvironments, this.normalizeValue);
 
     return {
       organizationId,
       applicationId,
       from,
       to,
-      level: level ?? parsedLevel,
-      service,
+      levels,
+      services,
+      environments,
       search,
       cursor,
       limit
+    };
+  }
+
+  private parseGetHistogramFilters(input: unknown): GetHistogramFilters {
+    const query = input as GetHistogramQuery;
+    const base = this.parseGetLogsFilters(query);
+
+    if (!base.from || !base.to) {
+      throw new RequestError("rf and rt must both be provided for histogram");
+    }
+
+    const bucketSizeMs = this.parseOptionalBucketSize(query.bucketSizeMs);
+
+    return {
+      organizationId: base.organizationId,
+      applicationId: base.applicationId,
+      from: base.from,
+      to: base.to,
+      levels: base.levels,
+      services: base.services,
+      environments: base.environments,
+      search: base.search,
+      bucketSizeMs
     };
   }
 
@@ -306,7 +370,20 @@ export class LogsService {
       throw new RequestError("limit must be a positive number");
     }
 
-    return Math.min(Math.floor(parsed), 1000);
+    return Math.min(Math.floor(parsed), 500);
+  }
+
+  private parseOptionalBucketSize(raw?: string): number | undefined {
+    if (!raw) {
+      return undefined;
+    }
+
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      throw new RequestError("bucketSizeMs must be a positive number");
+    }
+
+    return Math.min(Math.max(Math.floor(parsed), MIN_BUCKET_MS), MAX_BUCKET_MS);
   }
 
   private parseCursor(rawCursor?: string): LogsCursor | undefined {
@@ -418,6 +495,50 @@ export class LogsService {
 
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : undefined;
+  }
+
+  private parseCsv(value?: string): string[] {
+    if (!value) {
+      return [];
+    }
+
+    return value
+      .split(",")
+      .map(this.normalizeValue)
+      .filter((item) => item.length > 0);
+  }
+
+  private normalizeValue(value: string): string {
+    return value.trim().toLowerCase();
+  }
+
+  private toUnique(values: string[], mapper: (value: string) => string): string[] {
+    const result: string[] = [];
+    const seen = new Set<string>();
+
+    for (const value of values) {
+      const mapped = mapper(value);
+      if (mapped.length === 0 || seen.has(mapped)) {
+        continue;
+      }
+      seen.add(mapped);
+      result.push(mapped);
+    }
+
+    return result;
+  }
+
+  private normalizeBucketSize(bucketSizeMs: number, rangeMs: number): number {
+    const safeRange = Math.max(rangeMs, MIN_BUCKET_MS);
+    const safeBucket = Math.min(Math.max(bucketSizeMs, MIN_BUCKET_MS), MAX_BUCKET_MS);
+    const bucketCount = Math.ceil(safeRange / safeBucket);
+
+    if (bucketCount <= MAX_HISTOGRAM_BUCKETS) {
+      return safeBucket;
+    }
+
+    const scaled = Math.ceil(safeRange / MAX_HISTOGRAM_BUCKETS);
+    return Math.min(MAX_BUCKET_MS, Math.max(MIN_BUCKET_MS, Math.ceil(scaled / 1000) * 1000));
   }
 
   private requireString(value: string | undefined, message: string): string {

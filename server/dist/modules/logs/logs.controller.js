@@ -9,6 +9,10 @@ async function registerLogsController(app) {
         const result = await logsService.getLogs(request.query);
         reply.send(result);
     });
+    app.get("/logs/histogram", async (request, reply) => {
+        const result = await logsService.getHistogram(request.query);
+        reply.send(result);
+    });
     app.get("/metrics", async (request, reply) => {
         const result = await logsService.getMetrics(request.query);
         reply.send(result);

@@ -6,7 +6,7 @@ import {
   getDefaultOrganizationId,
 } from "@/lib/api/server";
 
-const DEFAULT_PAGE_SIZE = 200;
+const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_RANGE_MINUTES = 60;
 const MICROSECONDS_IN_MILLISECOND = BigInt(1000);
 
@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
       ?.split(",")
       .map((service) => service.trim())
       .filter(Boolean) ?? [];
+  const environments = parseCsv(params.get("environments"), isEnvironment);
   const organizationId = getDefaultOrganizationId();
   const applicationId = getDefaultApplicationId();
   let canonicalRange: { rf: string; rt: string };
@@ -99,7 +100,9 @@ export async function GET(request: NextRequest) {
     applicationId,
     rf: canonicalRange.rf,
     rt: canonicalRange.rt,
-    limit: String(Number.isFinite(pageSize) ? Math.min(Math.max(pageSize, 50), 500) : 200),
+    limit: String(
+      Number.isFinite(pageSize) ? Math.min(Math.max(Math.floor(pageSize), 25), 500) : 100
+    ),
   });
 
   const cursor = params.get("cursor");
@@ -108,18 +111,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (levels.length > 0) {
-    backendParams.set("level", levels[0]);
+    backendParams.set("levels", levels.join(","));
   }
 
-  const searchTokens: string[] = [];
   if (services.length > 0) {
-    searchTokens.push(`service:${services[0]}`);
+    backendParams.set("services", services.join(","));
   }
+
+  if (environments.length > 0) {
+    backendParams.set("environments", environments.join(","));
+  }
+
   if (query.length > 0) {
-    searchTokens.push(query);
-  }
-  if (searchTokens.length > 0) {
-    backendParams.set("search", searchTokens.join(" "));
+    backendParams.set("search", query);
   }
 
   const apiBaseUrl = getApiBaseUrl();
@@ -143,28 +147,23 @@ export async function GET(request: NextRequest) {
     nextCursor: string | null;
   };
 
-  const items: Log[] = payload.data
-    .map((item) => {
-      const metadata = (item.metadata ?? {}) as Record<string, unknown>;
-      const service = typeof metadata.service === "string" ? metadata.service : "unknown";
-      const env = metadata.env;
-      const environment: Log["environment"] =
-        env === "staging" || env === "dev" || env === "prod" ? env : "prod";
+  const items: Log[] = payload.data.map((item) => {
+    const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+    const service = typeof metadata.service === "string" ? metadata.service : "unknown";
+    const env = metadata.env;
+    const environment: Log["environment"] =
+      env === "staging" || env === "dev" || env === "prod" ? env : "prod";
 
-      return {
-        id: item.id,
-        timestamp: item.timestamp,
-        level: item.level,
-        message: item.message,
-        service,
-        environment,
-        metadata,
-      };
-    })
-    .filter((item) => {
-      const environments = parseCsv(params.get("environments"), isEnvironment);
-      return environments.length === 0 || environments.includes(item.environment);
-    });
+    return {
+      id: item.id,
+      timestamp: item.timestamp,
+      level: item.level,
+      message: item.message,
+      service,
+      environment,
+      metadata,
+    };
+  });
 
   return NextResponse.json({
     items,

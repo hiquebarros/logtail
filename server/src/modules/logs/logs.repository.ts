@@ -1,6 +1,6 @@
 import { Prisma, type Log as PrismaLog } from "@prisma/client";
 import { prisma } from "../../prisma/client";
-import { CreateLogInput, GetLogsFilters } from "./logs.types";
+import { CreateLogInput, GetHistogramFilters, GetLogsFilters } from "./logs.types";
 
 type FindLogsParams = GetLogsFilters;
 
@@ -11,8 +11,8 @@ export class LogsRepository {
       applicationId: params.applicationId
     };
 
-    if (params.level) {
-      baseWhere.level = params.level;
+    if (params.levels.length > 0) {
+      baseWhere.level = { in: params.levels };
     }
 
     if (params.search) {
@@ -22,11 +22,42 @@ export class LogsRepository {
       };
     }
 
-    if (params.service) {
-      baseWhere.metadata = {
-        path: ["service"],
-        equals: params.service
-      };
+    if (params.services.length > 0) {
+      const existingAnd = Array.isArray(baseWhere.AND)
+        ? baseWhere.AND
+        : baseWhere.AND
+          ? [baseWhere.AND]
+          : [];
+      baseWhere.AND = [
+        ...existingAnd,
+        {
+          OR: params.services.map((service) => ({
+            metadata: {
+              path: ["service"],
+              equals: service
+            }
+          }))
+        }
+      ];
+    }
+
+    if (params.environments.length > 0) {
+      const existingAnd = Array.isArray(baseWhere.AND)
+        ? baseWhere.AND
+        : baseWhere.AND
+          ? [baseWhere.AND]
+          : [];
+      baseWhere.AND = [
+        ...existingAnd,
+        {
+          OR: params.environments.map((environment) => ({
+            metadata: {
+              path: ["env"],
+              equals: environment
+            }
+          }))
+        }
+      ];
     }
 
     if (params.from || params.to) {
@@ -65,6 +96,56 @@ export class LogsRepository {
       orderBy: [{ timestamp: "desc" }, { id: "desc" }],
       take: params.limit + 1
     });
+  }
+
+  async getHistogram(
+    params: GetHistogramFilters,
+    bucketSizeMs: number
+  ): Promise<Array<{ ts: number; count: number }>> {
+    const whereClauses: Prisma.Sql[] = [
+      Prisma.sql`"organization_id" = ${params.organizationId}::uuid`,
+      Prisma.sql`"application_id" = ${params.applicationId}::uuid`,
+      Prisma.sql`"timestamp" >= ${params.from}`,
+      Prisma.sql`"timestamp" <= ${params.to}`
+    ];
+
+    if (params.levels.length > 0) {
+      whereClauses.push(Prisma.sql`"level" IN (${Prisma.join(params.levels)})`);
+    }
+
+    if (params.services.length > 0) {
+      whereClauses.push(
+        Prisma.sql`COALESCE("metadata"->>'service', 'unknown') IN (${Prisma.join(params.services)})`
+      );
+    }
+
+    if (params.environments.length > 0) {
+      whereClauses.push(
+        Prisma.sql`COALESCE("metadata"->>'env', 'prod') IN (${Prisma.join(params.environments)})`
+      );
+    }
+
+    if (params.search) {
+      whereClauses.push(Prisma.sql`"message" ILIKE ${`%${params.search}%`}`);
+    }
+
+    const whereSql = Prisma.join(whereClauses, " AND ");
+    const rows = await prisma.$queryRaw<Array<{ ts: bigint; count: bigint }>>(Prisma.sql`
+      SELECT
+        (
+          FLOOR((EXTRACT(EPOCH FROM "timestamp") * 1000) / ${bucketSizeMs})::bigint * ${bucketSizeMs}
+        ) AS "ts",
+        COUNT(*)::bigint AS "count"
+      FROM "logs"
+      WHERE ${whereSql}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `);
+
+    return rows.map((row) => ({
+      ts: Number(row.ts),
+      count: Number(row.count)
+    }));
   }
 
   async createBatch(

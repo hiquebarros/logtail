@@ -1,4 +1,4 @@
-import type { LogFilters, LogsPageResponse } from "@/lib/types/logs";
+import type { LogFilters, LogHistogramResponse, LogsPageResponse } from "@/lib/types/logs";
 import type { MetricsResponse } from "@/lib/types/metrics";
 
 function toParams(filters: LogFilters) {
@@ -23,12 +23,29 @@ export async function fetchLogsPage(input: {
   limit?: number;
 }): Promise<LogsPageResponse> {
   const params = toParams(input.filters);
-  params.set("limit", String(input.limit ?? 200));
+  params.set("limit", String(input.limit ?? 100));
   if (input.pageParam) params.set("cursor", input.pageParam);
 
   const response = await fetch(`/api/logs?${params.toString()}`);
   if (!response.ok) {
     throw new Error("Failed to fetch logs");
+  }
+
+  return response.json();
+}
+
+export async function fetchLogsHistogram(input: {
+  filters: LogFilters;
+  bucketSizeMs?: number;
+}): Promise<LogHistogramResponse> {
+  const params = toParams(input.filters);
+  if (input.bucketSizeMs) {
+    params.set("bucketSizeMs", String(input.bucketSizeMs));
+  }
+
+  const response = await fetch(`/api/logs/histogram?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch log histogram");
   }
 
   return response.json();

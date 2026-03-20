@@ -20,8 +20,9 @@ export type GetLogsFilters = {
   applicationId: string;
   from?: Date;
   to?: Date;
-  level?: string;
-  service?: string;
+  levels: string[];
+  services: string[];
+  environments: string[];
   search?: string;
   cursor?: LogsCursor;
   limit: number;
@@ -36,9 +37,40 @@ export type GetLogsQuery = {
   to?: string;
   rangeMinutes?: string;
   level?: string;
+  levels?: string;
+  services?: string;
+  environments?: string;
   search?: string;
   cursor?: string;
   limit?: string;
+};
+
+export type GetHistogramQuery = {
+  organizationId?: string;
+  applicationId?: string;
+  rf?: string;
+  rt?: string;
+  from?: string;
+  to?: string;
+  rangeMinutes?: string;
+  level?: string;
+  levels?: string;
+  services?: string;
+  environments?: string;
+  search?: string;
+  bucketSizeMs?: string;
+};
+
+export type GetHistogramFilters = {
+  organizationId: string;
+  applicationId: string;
+  from: Date;
+  to: Date;
+  levels: string[];
+  services: string[];
+  environments: string[];
+  search?: string;
+  bucketSizeMs?: number;
 };
 
 export type StreamLogsQuery = {
@@ -104,4 +136,15 @@ export type CreateLogsBatchRequest = {
 export type LogsPage = {
   data: LogItem[];
   nextCursor: string | null;
+};
+
+export type HistogramBucket = {
+  ts: number;
+  count: number;
+};
+
+export type HistogramResponse = {
+  buckets: HistogramBucket[];
+  bucketSizeMs: number;
+  totalInRange: number;
 };

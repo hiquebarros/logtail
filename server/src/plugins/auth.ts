@@ -4,6 +4,7 @@ declare module "fastify" {
   interface Session {
     user?: {
       id: string;
+      activeOrganizationId: string;
     };
   }
   interface FastifyInstance {
@@ -18,8 +19,9 @@ export async function registerAuthPlugin(app: FastifyInstance): Promise<void> {
   app.decorate(
     "authenticate",
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      if (!request.session.user) {
+      if (!request.session.user?.id || !request.session.user?.activeOrganizationId) {
         reply.code(401).send({ message: "Unauthorized" });
+        return;
       }
     }
   );

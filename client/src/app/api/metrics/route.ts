@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getApiBaseUrl,
-  getDefaultApplicationId,
-  getDefaultOrganizationId,
-} from "@/lib/api/server";
+import { getApiBaseUrl } from "@/lib/api/server";
 
 export async function GET(request: NextRequest) {
   const rangeMinutes = Number(request.nextUrl.searchParams.get("rangeMinutes") ?? 60);
   const normalizedRange = Number.isFinite(rangeMinutes)
     ? Math.min(Math.max(Math.floor(rangeMinutes), 5), 24 * 60)
     : 60;
+  const applicationId = request.nextUrl.searchParams.get("applicationId")?.trim() || "";
   const params = new URLSearchParams({
-    organizationId: getDefaultOrganizationId(),
-    applicationId: getDefaultApplicationId(),
     rangeMinutes: String(normalizedRange),
   });
+  if (applicationId) {
+    params.set("applicationId", applicationId);
+  }
   const apiBaseUrl = getApiBaseUrl();
   const response = await fetch(`${apiBaseUrl}/metrics?${params.toString()}`, {
     method: "GET",
+    headers: {
+      cookie: request.headers.get("cookie") ?? "",
+    },
     cache: "no-store",
   });
 

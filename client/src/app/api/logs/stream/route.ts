@@ -1,22 +1,21 @@
 import {
   getApiBaseUrl,
-  getDefaultApplicationId,
-  getDefaultOrganizationId,
 } from "@/lib/api/server";
 
 export async function GET(request: Request) {
   const apiBaseUrl = getApiBaseUrl();
   const searchParams = new URL(request.url).searchParams;
-  const organizationId = searchParams.get("organizationId") || getDefaultOrganizationId();
-  const applicationId = searchParams.get("applicationId") || getDefaultApplicationId();
+  const applicationId = searchParams.get("applicationId");
   const backendUrl = new URL(`${apiBaseUrl}/logs/stream`);
-  backendUrl.searchParams.set("organizationId", organizationId);
-  backendUrl.searchParams.set("applicationId", applicationId);
+  if (applicationId) {
+    backendUrl.searchParams.set("applicationId", applicationId);
+  }
 
   const response = await fetch(backendUrl.toString(), {
     method: "GET",
     headers: {
       Accept: "text/event-stream",
+      cookie: request.headers.get("cookie") ?? "",
     },
     cache: "no-store",
     signal: request.signal,

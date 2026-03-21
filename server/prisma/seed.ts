@@ -228,30 +228,105 @@ async function seedLogs(): Promise<void> {
 
 async function seedAuthUsers(): Promise<void> {
   const passwordHash = await bcrypt.hash("password123", 10);
-  const organizationId = ORGANIZATIONS[0].id;
+  const orgOne = ORGANIZATIONS[0].id;
+  const orgTwo = ORGANIZATIONS[1].id;
 
-  await prisma.user.upsert({
+  const admin = await prisma.user.upsert({
     where: {
-      organizationId_email: {
-        organizationId,
-        email: "admin@logtail.dev"
-      }
+      email: "admin@logtail.dev"
     },
-    update: { password: passwordHash },
+    update: {
+      password: passwordHash,
+      organizationId: orgOne
+    },
     create: {
-      organizationId,
+      organizationId: orgOne,
       email: "admin@logtail.dev",
-      password: passwordHash
+      password: passwordHash,
+      name: "Admin User"
     }
   });
 
-  console.log("Seeded auth user admin@logtail.dev.");
+  const operator = await prisma.user.upsert({
+    where: {
+      email: "ops@logtail.dev"
+    },
+    update: {
+      password: passwordHash,
+      organizationId: orgOne
+    },
+    create: {
+      organizationId: orgOne,
+      email: "ops@logtail.dev",
+      password: passwordHash,
+      name: "Ops User"
+    }
+  });
+
+  await prisma.organizationMember.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: orgOne,
+        userId: admin.id
+      }
+    },
+    update: {
+      role: "owner",
+      status: "active"
+    },
+    create: {
+      organizationId: orgOne,
+      userId: admin.id,
+      role: "owner",
+      status: "active"
+    }
+  });
+
+  await prisma.organizationMember.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: orgOne,
+        userId: operator.id
+      }
+    },
+    update: {
+      role: "admin",
+      status: "active"
+    },
+    create: {
+      organizationId: orgOne,
+      userId: operator.id,
+      role: "admin",
+      status: "active"
+    }
+  });
+
+  await prisma.organizationMember.upsert({
+    where: {
+      organizationId_userId: {
+        organizationId: orgTwo,
+        userId: operator.id
+      }
+    },
+    update: {
+      role: "member",
+      status: "active"
+    },
+    create: {
+      organizationId: orgTwo,
+      userId: operator.id,
+      role: "member",
+      status: "active"
+    }
+  });
+
+  console.log("Seeded auth users admin@logtail.dev and ops@logtail.dev.");
 }
 
 async function main(): Promise<void> {
-  //await seedOrganizationsAndApplications();
+  await seedOrganizationsAndApplications();
+  await seedAuthUsers();
   await seedLogs();
-  //await seedAuthUsers();
 }
 
 main()

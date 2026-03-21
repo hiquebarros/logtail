@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { Log, LogLevel } from "@/lib/types/logs";
-import {
-  getApiBaseUrl,
-  getDefaultApplicationId,
-  getDefaultOrganizationId,
-} from "@/lib/api/server";
+import { getApiBaseUrl } from "@/lib/api/server";
 
 const DEFAULT_PAGE_SIZE = 100;
 const DEFAULT_RANGE_MINUTES = 60;
@@ -83,8 +79,7 @@ export async function GET(request: NextRequest) {
       .map((service) => service.trim())
       .filter(Boolean) ?? [];
   const environments = parseCsv(params.get("environments"), isEnvironment);
-  const organizationId = getDefaultOrganizationId();
-  const applicationId = getDefaultApplicationId();
+  const applicationId = params.get("applicationId")?.trim() || "";
   let canonicalRange: { rf: string; rt: string };
   try {
     canonicalRange = parseCanonicalRange(params);
@@ -96,8 +91,6 @@ export async function GET(request: NextRequest) {
   }
 
   const backendParams = new URLSearchParams({
-    organizationId,
-    applicationId,
     rf: canonicalRange.rf,
     rt: canonicalRange.rt,
     limit: String(
@@ -108,6 +101,9 @@ export async function GET(request: NextRequest) {
   const cursor = params.get("cursor");
   if (cursor) {
     backendParams.set("cursor", cursor);
+  }
+  if (applicationId) {
+    backendParams.set("applicationId", applicationId);
   }
 
   if (levels.length > 0) {
@@ -129,6 +125,9 @@ export async function GET(request: NextRequest) {
   const apiBaseUrl = getApiBaseUrl();
   const response = await fetch(`${apiBaseUrl}/logs?${backendParams.toString()}`, {
     method: "GET",
+    headers: {
+      cookie: request.headers.get("cookie") ?? "",
+    },
     cache: "no-store",
   });
 

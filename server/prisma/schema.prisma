@@ -13,6 +13,7 @@ model Organization {
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
   users        User[]
+  members      OrganizationMember[]
   applications Application[]
   logs         Log[]
 
@@ -20,18 +21,48 @@ model Organization {
 }
 
 model User {
-  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  email          String       @db.VarChar(255)
-  password       String?      @db.VarChar(255)
-  name           String?      @db.VarChar(255)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String?              @map("organization_id") @db.Uuid
+  email          String               @unique @db.VarChar(255)
+  password       String?              @db.VarChar(255)
+  name           String?              @db.VarChar(255)
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+  organization   Organization?        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships    OrganizationMember[]
 
-  @@unique([organizationId, email])
   @@index([organizationId])
   @@map("users")
+}
+
+enum OrganizationMemberRole {
+  owner
+  admin
+  member
+  viewer
+}
+
+enum OrganizationMemberStatus {
+  active
+  invited
+  suspended
+}
+
+model OrganizationMember {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  userId         String                   @map("user_id") @db.Uuid
+  role           OrganizationMemberRole   @default(member)
+  status         OrganizationMemberStatus @default(active)
+  createdAt      DateTime                 @default(now()) @map("created_at")
+  updatedAt      DateTime                 @updatedAt @map("updated_at")
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_members")
 }
 
 model Application {

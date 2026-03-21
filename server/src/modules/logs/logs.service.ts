@@ -1,5 +1,6 @@
 import { LogsRepository } from "./logs.repository";
 import { parseLogSearch } from "./logs.parser";
+import { prisma } from "../../prisma/client";
 import {
   CreateLogInput,
   CreateLogsBatchRequest,
@@ -52,6 +53,48 @@ const HISTOGRAM_BUCKET_LADDER_MS = [
 
 export class LogsService {
   constructor(private readonly logsRepository: LogsRepository) {}
+
+  async resolveAccessibleApplicationId(
+    organizationId: string,
+    requestedApplicationId?: string
+  ): Promise<string> {
+    if (requestedApplicationId) {
+      const app = await prisma.application.findFirst({
+        where: {
+          id: requestedApplicationId,
+          organizationId
+        },
+        select: {
+          id: true
+        }
+      });
+      if (!app) {
+        throw new RequestError(
+          "Application does not belong to the active organization",
+          403
+        );
+      }
+
+      return app.id;
+    }
+
+    const firstApp = await prisma.application.findFirst({
+      where: {
+        organizationId
+      },
+      orderBy: {
+        createdAt: "asc"
+      },
+      select: {
+        id: true
+      }
+    });
+    if (!firstApp) {
+      throw new RequestError("No applications found for active organization", 404);
+    }
+
+    return firstApp.id;
+  }
 
   async getLogs(query: unknown): Promise<LogsPage> {
     const filters = this.parseGetLogsFilters(query);

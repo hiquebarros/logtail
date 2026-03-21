@@ -14,7 +14,8 @@ export class LocalStrategy implements AuthStrategy<LocalStrategyInput, User> {
   constructor(private readonly authService: AuthService) {}
 
   async authenticate(input: LocalStrategyInput): Promise<User> {
-    const user = await this.authService.findUserByEmail(input.email);
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const user = await this.authService.findUserByEmail(normalizedEmail);
     if (!user) {
       throw new AuthError("Invalid credentials");
     }

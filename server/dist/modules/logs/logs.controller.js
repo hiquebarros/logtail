@@ -4,25 +4,80 @@ exports.registerLogsController = registerLogsController;
 const logs_repository_1 = require("./logs.repository");
 const logs_service_1 = require("./logs.service");
 const logsService = new logs_service_1.LogsService(new logs_repository_1.LogsRepository());
+function getActiveOrganizationId(request) {
+    const organizationId = request.session.user?.activeOrganizationId;
+    if (!organizationId) {
+        const error = new Error("Unauthorized");
+        error.statusCode = 401;
+        throw error;
+    }
+    return organizationId;
+}
+function getOptionalString(source, key) {
+    if (!source || typeof source !== "object") {
+        return undefined;
+    }
+    const value = source[key];
+    return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
 async function registerLogsController(app) {
-    app.get("/logs", async (request, reply) => {
-        const result = await logsService.getLogs(request.query);
+    app.get("/logs", { preHandler: [app.authenticate] }, async (request, reply) => {
+        const organizationId = getActiveOrganizationId(request);
+        const requestedApplicationId = getOptionalString(request.query, "applicationId");
+        const applicationId = await logsService.resolveAccessibleApplicationId(organizationId, requestedApplicationId);
+        const scopedQuery = {
+            ...request.query,
+            organizationId,
+            applicationId
+        };
+        const result = await logsService.getLogs(scopedQuery);
         reply.send(result);
     });
-    app.get("/logs/histogram", async (request, reply) => {
-        const result = await logsService.getHistogram(request.query);
+    app.get("/logs/histogram", { preHandler: [app.authenticate] }, async (request, reply) => {
+        const organizationId = getActiveOrganizationId(request);
+        const requestedApplicationId = getOptionalString(request.query, "applicationId");
+        const applicationId = await logsService.resolveAccessibleApplicationId(organizationId, requestedApplicationId);
+        const scopedQuery = {
+            ...request.query,
+            organizationId,
+            applicationId
+        };
+        const result = await logsService.getHistogram(scopedQuery);
         reply.send(result);
     });
-    app.get("/metrics", async (request, reply) => {
-        const result = await logsService.getMetrics(request.query);
+    app.get("/metrics", { preHandler: [app.authenticate] }, async (request, reply) => {
+        const organizationId = getActiveOrganizationId(request);
+        const requestedApplicationId = getOptionalString(request.query, "applicationId");
+        const applicationId = await logsService.resolveAccessibleApplicationId(organizationId, requestedApplicationId);
+        const scopedQuery = {
+            ...request.query,
+            organizationId,
+            applicationId
+        };
+        const result = await logsService.getMetrics(scopedQuery);
         reply.send(result);
     });
-    app.post("/logs", async (request, reply) => {
-        const result = await logsService.createLogsBatch(request.body);
+    app.post("/logs", { preHandler: [app.authenticate] }, async (request, reply) => {
+        const organizationId = getActiveOrganizationId(request);
+        const requestedApplicationId = getOptionalString(request.body, "applicationId");
+        const applicationId = await logsService.resolveAccessibleApplicationId(organizationId, requestedApplicationId);
+        const scopedBody = {
+            ...request.body,
+            organizationId,
+            applicationId
+        };
+        const result = await logsService.createLogsBatch(scopedBody);
         reply.code(201).send(result);
     });
-    app.get("/logs/stream", async (request, reply) => {
-        const streamFilters = logsService.parseStreamFilters(request.query);
+    app.get("/logs/stream", { preHandler: [app.authenticate] }, async (request, reply) => {
+        const organizationId = getActiveOrganizationId(request);
+        const requestedApplicationId = getOptionalString(request.query, "applicationId");
+        const applicationId = await logsService.resolveAccessibleApplicationId(organizationId, requestedApplicationId);
+        const streamFilters = logsService.parseStreamFilters({
+            ...request.query,
+            organizationId,
+            applicationId
+        });
         let lastCursor = {
             timestamp: new Date(),
             id: "00000000-0000-0000-0000-000000000000"

@@ -9,6 +9,7 @@ const auth_1 = require("./plugins/auth");
 const session_1 = require("./plugins/session");
 const auth_routes_1 = require("./modules/auth/auth.routes");
 const logs_controller_1 = require("./modules/logs/logs.controller");
+const sources_controller_1 = require("./modules/sources/sources.controller");
 async function buildApp() {
     const app = (0, fastify_1.default)({ logger: true });
     app.setErrorHandler((error, _request, reply) => {
@@ -27,5 +28,6 @@ async function buildApp() {
     await (0, auth_1.registerAuthPlugin)(app);
     await (0, auth_routes_1.registerAuthRoutes)(app);
     await (0, logs_controller_1.registerLogsController)(app);
+    await (0, sources_controller_1.registerSourcesController)(app);
     return app;
 }

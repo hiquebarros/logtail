@@ -3,6 +3,7 @@ import { registerAuthPlugin } from "./plugins/auth";
 import { registerSessionPlugin } from "./plugins/session";
 import { registerAuthRoutes } from "./modules/auth/auth.routes";
 import { registerLogsController } from "./modules/logs/logs.controller";
+import { registerSourcesController } from "./modules/sources/sources.controller";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
@@ -28,6 +29,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerAuthPlugin(app);
   await registerAuthRoutes(app);
   await registerLogsController(app);
+  await registerSourcesController(app);
 
   return app;
 }

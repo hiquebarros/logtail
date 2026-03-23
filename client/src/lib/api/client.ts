@@ -1,5 +1,11 @@
 import type { LogFilters, LogHistogramResponse, LogsPageResponse } from "@/lib/types/logs";
 import type { MetricsResponse } from "@/lib/types/metrics";
+import type {
+  CreateSourceInput,
+  SourceDetailResponse,
+  SourcesListResponse,
+  UpdateSourceInput
+} from "@/lib/types/sources";
 
 function toParams(filters: LogFilters) {
   const params = new URLSearchParams({
@@ -55,6 +61,70 @@ export async function fetchMetrics(rangeMinutes: number): Promise<MetricsRespons
   const response = await fetch(`/api/metrics?rangeMinutes=${rangeMinutes}`);
   if (!response.ok) {
     throw new Error("Failed to fetch metrics");
+  }
+
+  return response.json();
+}
+
+export async function fetchSources(): Promise<SourcesListResponse> {
+  const response = await fetch("/api/sources", {
+    method: "GET"
+  });
+  if (!response.ok) {
+    throw new Error("Failed to fetch sources");
+  }
+
+  return response.json();
+}
+
+export async function createSource(input: CreateSourceInput): Promise<SourceDetailResponse> {
+  const response = await fetch("/api/sources", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw new Error(payload.message || "Failed to create source");
+  }
+
+  return response.json();
+}
+
+export async function fetchSourceById(sourceId: string): Promise<SourceDetailResponse> {
+  const response = await fetch(`/api/sources/${sourceId}`, {
+    method: "GET"
+  });
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Source not found");
+    }
+    throw new Error("Failed to fetch source details");
+  }
+
+  return response.json();
+}
+
+export async function updateSourceById(
+  sourceId: string,
+  input: UpdateSourceInput
+): Promise<SourceDetailResponse> {
+  const response = await fetch(`/api/sources/${sourceId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      message?: string;
+    };
+    throw new Error(payload.message || "Failed to update source");
   }
 
   return response.json();

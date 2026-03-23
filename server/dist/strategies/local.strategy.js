@@ -7,7 +7,8 @@ class LocalStrategy {
         this.authService = authService;
     }
     async authenticate(input) {
-        const user = await this.authService.findUserByEmail(input.email);
+        const normalizedEmail = input.email.trim().toLowerCase();
+        const user = await this.authService.findUserByEmail(normalizedEmail);
         if (!user) {
             throw new auth_service_1.AuthError("Invalid credentials");
         }

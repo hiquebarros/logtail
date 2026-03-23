@@ -29,64 +29,73 @@ const ACTIONS = [
 ] as const;
 
 const ORGANIZATIONS = [
-  { id: "10000000-0000-0000-0000-000000000001", name: "Acme Corp" },
-  { id: "10000000-0000-0000-0000-000000000002", name: "Globex" },
-  { id: "10000000-0000-0000-0000-000000000003", name: "Initech" }
+  { id: "10000000-0000-4000-8000-000000000001", name: "Acme Corp" },
+  { id: "10000000-0000-4000-8000-000000000002", name: "Globex" },
+  { id: "10000000-0000-4000-8000-000000000003", name: "Initech" }
 ];
 
 const APPLICATIONS = [
   {
-    id: "20000000-0000-0000-0000-000000000001",
-    organizationId: "10000000-0000-0000-0000-000000000001",
+    id: "20000000-0000-4000-8000-000000000001",
+    organizationId: "10000000-0000-4000-8000-000000000001",
     name: "Checkout API",
+    language: "JS",
     apiKey: "seed-acme-checkout-api"
   },
   {
-    id: "20000000-0000-0000-0000-000000000002",
-    organizationId: "10000000-0000-0000-0000-000000000001",
+    id: "20000000-0000-4000-8000-000000000002",
+    organizationId: "10000000-0000-4000-8000-000000000001",
     name: "Backoffice",
+    language: "PHP",
     apiKey: "seed-acme-backoffice"
   },
   {
-    id: "20000000-0000-0000-0000-000000000003",
-    organizationId: "10000000-0000-0000-0000-000000000001",
+    id: "20000000-0000-4000-8000-000000000003",
+    organizationId: "10000000-0000-4000-8000-000000000001",
     name: "Webhook Worker",
+    language: "GO",
     apiKey: "seed-acme-webhook-worker"
   },
   {
-    id: "20000000-0000-0000-0000-000000000004",
-    organizationId: "10000000-0000-0000-0000-000000000002",
+    id: "20000000-0000-4000-8000-000000000004",
+    organizationId: "10000000-0000-4000-8000-000000000002",
     name: "Checkout API",
+    language: "JS",
     apiKey: "seed-globex-checkout-api"
   },
   {
-    id: "20000000-0000-0000-0000-000000000005",
-    organizationId: "10000000-0000-0000-0000-000000000002",
+    id: "20000000-0000-4000-8000-000000000005",
+    organizationId: "10000000-0000-4000-8000-000000000002",
     name: "Backoffice",
+    language: "PYTHON",
     apiKey: "seed-globex-backoffice"
   },
   {
-    id: "20000000-0000-0000-0000-000000000006",
-    organizationId: "10000000-0000-0000-0000-000000000002",
+    id: "20000000-0000-4000-8000-000000000006",
+    organizationId: "10000000-0000-4000-8000-000000000002",
     name: "Webhook Worker",
+    language: "GO",
     apiKey: "seed-globex-webhook-worker"
   },
   {
-    id: "20000000-0000-0000-0000-000000000007",
-    organizationId: "10000000-0000-0000-0000-000000000003",
+    id: "20000000-0000-4000-8000-000000000007",
+    organizationId: "10000000-0000-4000-8000-000000000003",
     name: "Checkout API",
+    language: "JS",
     apiKey: "seed-initech-checkout-api"
   },
   {
-    id: "20000000-0000-0000-0000-000000000008",
-    organizationId: "10000000-0000-0000-0000-000000000003",
+    id: "20000000-0000-4000-8000-000000000008",
+    organizationId: "10000000-0000-4000-8000-000000000003",
     name: "Backoffice",
+    language: "OTHER",
     apiKey: "seed-initech-backoffice"
   },
   {
-    id: "20000000-0000-0000-0000-000000000009",
-    organizationId: "10000000-0000-0000-0000-000000000003",
+    id: "20000000-0000-4000-8000-000000000009",
+    organizationId: "10000000-0000-4000-8000-000000000003",
     name: "Webhook Worker",
+    language: "GO",
     apiKey: "seed-initech-webhook-worker"
   }
 ];
@@ -155,17 +164,19 @@ async function seedOrganizationsAndApplications(): Promise<void> {
   for (const app of APPLICATIONS) {
     await prisma.application.upsert({
       where: { id: app.id },
-      update: {
+      update: ({
         name: app.name,
+        language: app.language,
         apiKey: app.apiKey,
         organizationId: app.organizationId
-      },
-      create: {
+      } as unknown as Prisma.ApplicationUncheckedUpdateInput),
+      create: ({
         id: app.id,
         name: app.name,
+        language: app.language,
         apiKey: app.apiKey,
         organizationId: app.organizationId
-      }
+      } as unknown as Prisma.ApplicationUncheckedCreateInput)
     });
   }
 }

@@ -48,6 +48,14 @@ enum OrganizationMemberStatus {
   suspended
 }
 
+enum ApplicationLanguage {
+  JS
+  PHP
+  GO
+  PYTHON
+  OTHER
+}
+
 model OrganizationMember {
   id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String                   @map("organization_id") @db.Uuid
@@ -69,6 +77,7 @@ model Application {
   id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   name           String       @db.VarChar(255)
+  language       ApplicationLanguage @default(OTHER)
   apiKey         String       @unique @map("api_key") @db.VarChar(255)
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")

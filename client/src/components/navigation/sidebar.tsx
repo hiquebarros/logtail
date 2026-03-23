@@ -26,6 +26,7 @@ const mainSections: MainSectionItem[] = [
 
 const telemetryItems: NavItem[] = [
   { label: "Services", href: "/services", icon: <SquaresIcon /> },
+  { label: "Sources", href: "/sources", icon: <CubeIcon /> },
   { label: "Live Tail", href: "/logs", icon: <LinesIcon /> },
   { label: "Metrics", href: "/dashboard", icon: <ChartIcon /> },
 ];
@@ -142,6 +143,17 @@ function ChartIcon() {
   );
 }
 
+function CubeIcon() {
+  return (
+    <IconWrap>
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+        <path d="M12 12l8-4.5M12 12L4 7.5M12 12v9" />
+      </svg>
+    </IconWrap>
+  );
+}
+
 function SlidersIcon() {
   return (
     <IconWrap>
@@ -208,6 +220,8 @@ export function Sidebar() {
         ? "/dashboard"
         : pathname.startsWith("/logs")
           ? "/logs"
+          : pathname.startsWith("/sources")
+            ? "/sources"
           : pathname.startsWith("/services")
             ? "/services"
             : pathname.startsWith("/configurations")

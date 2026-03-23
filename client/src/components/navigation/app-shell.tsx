@@ -17,9 +17,9 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-[1600px] bg-zinc-950 text-zinc-100 lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 lg:grid lg:grid-cols-[auto_1fr]">
       <Sidebar />
-      <div className="min-w-0">{children}</div>
+      <div className="min-w-0 pt-12 lg:pt-0">{children}</div>
     </div>
   );
 }

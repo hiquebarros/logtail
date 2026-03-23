@@ -60,21 +60,26 @@ type MePayload = {
 function NavLink({
   item,
   activePath,
+  isCompact,
 }: {
   item: NavItem;
   activePath: string;
+  isCompact: boolean;
 }) {
   const isActive = activePath === item.href;
 
   return (
     <Link
       href={item.href}
-      className={`flex items-center gap-2 rounded-md transition ${
+      title={isCompact ? item.label : undefined}
+      className={`flex items-center rounded-md transition ${
+        isCompact ? "h-9 justify-center px-0" : "gap-2 px-2.5 py-2"
+      } ${
         isActive ? "bg-zinc-800 text-white" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"
       }`}
     >
       <span className="shrink-0">{item.icon}</span>
-      <span className="text-sm">{item.label}</span>
+      {isCompact ? <span className="sr-only">{item.label}</span> : <span className="text-sm">{item.label}</span>}
     </Link>
   );
 }
@@ -176,6 +181,14 @@ function BarsIcon() {
   );
 }
 
+function PanelToggleIcon({ collapsed }: { collapsed: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+      {collapsed ? <path d="M10 6l6 6-6 6M4 6l6 6-6 6" /> : <path d="M14 6l-6 6 6 6M20 6l-6 6 6 6" />}
+    </svg>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -187,6 +200,7 @@ export function Sidebar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const activePath =
     pathname === "/"
       ? "/dashboard"
@@ -332,11 +346,17 @@ export function Sidebar() {
       )}
 
       <aside
-        className={`fixed bottom-0 top-0 z-30 flex items-stretch border-r border-zinc-800 bg-zinc-950 transition-all lg:sticky lg:top-0 ${
-          isMobileOpen ? "left-0" : "-left-[272px] lg:left-0"
-        } w-[272px]`}
+        className={`fixed bottom-0 top-0 z-30 flex items-stretch border-r border-zinc-800 bg-zinc-900/85 backdrop-blur-sm transition-all duration-200 lg:sticky lg:top-0 ${
+          isPanelCollapsed ? "w-[124px]" : "w-[272px]"
+        } ${
+          isMobileOpen
+            ? "left-0"
+            : isPanelCollapsed
+              ? "-left-[124px] lg:left-0"
+              : "-left-[272px] lg:left-0"
+        }`}
       >
-        <div className="flex w-[52px] flex-col justify-between border-r border-zinc-800 py-3">
+        <div className="flex w-[52px] flex-col justify-between border-r border-zinc-800 bg-zinc-900 py-3">
           <div className="flex min-h-[220px] flex-col items-center">
             <div className="mb-2 hidden h-[52px] items-center justify-center lg:flex">
               <div className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 text-[11px] font-bold text-zinc-200">
@@ -433,19 +453,49 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="w-[220px] border-r border-zinc-800">
+        <div
+          className={`border-r border-zinc-800 bg-zinc-900/70 transition-all duration-200 ${
+            isPanelCollapsed ? "w-[72px]" : "w-[220px]"
+          }`}
+        >
           <div className="flex h-full flex-col pt-2.5">
-            <div className="mb-3 flex h-[34px] items-center justify-between pl-4 pr-2">
-              <span className="text-sm font-semibold text-zinc-100">
-                {activeMainSection === "telemetry" ? "Telemetry" : "Configurations"}
-              </span>
+            <div
+              className={`mb-3 flex h-[34px] items-center pr-2 ${
+                isPanelCollapsed ? "justify-center pl-2" : "justify-between pl-4"
+              }`}
+            >
+              {!isPanelCollapsed ? (
+                <span className="text-sm font-semibold text-zinc-100">
+                  {activeMainSection === "telemetry" ? "Telemetry" : "Configurations"}
+                </span>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPanelCollapsed((value) => !value);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+                title={isPanelCollapsed ? "Expand panel" : "Collapse panel"}
+              >
+                <PanelToggleIcon collapsed={isPanelCollapsed} />
+                <span className="sr-only">{isPanelCollapsed ? "Expand panel" : "Collapse panel"}</span>
+              </button>
             </div>
 
-            <div className="flex flex-1 flex-col gap-y-2 overflow-y-auto px-3 pb-3">
+            <div
+              className={`flex flex-1 flex-col gap-y-2 overflow-y-auto pb-3 ${
+                isPanelCollapsed ? "px-2" : "px-3"
+              }`}
+            >
               <section>
                 <div className="space-y-1">
                   {panelItems.map((item) => (
-                    <NavLink key={item.href} item={item} activePath={activePath} />
+                    <NavLink
+                      key={item.href}
+                      item={item}
+                      activePath={activePath}
+                      isCompact={isPanelCollapsed}
+                    />
                   ))}
                 </div>
               </section>

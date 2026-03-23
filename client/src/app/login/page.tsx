@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 type MeResponse = {
   user?: {
@@ -14,11 +15,17 @@ type MeResponse = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const nextParam = searchParams.get("next");
+  const nextPath =
+    nextParam && nextParam.startsWith("/") && nextParam !== "/login"
+      ? nextParam
+      : "/logs";
 
   useEffect(() => {
     const run = async () => {
@@ -28,7 +35,7 @@ export default function LoginPage() {
       });
 
       if (response.ok) {
-        router.replace("/logs");
+        router.replace(nextPath);
         return;
       }
 
@@ -36,7 +43,7 @@ export default function LoginPage() {
     };
 
     void run();
-  }, [router]);
+  }, [nextPath, router]);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,7 +69,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/logs");
+    router.push(nextPath);
   };
 
   if (isCheckingSession) {

@@ -139,8 +139,11 @@ export class LogsService {
     };
   }
 
-  async createLogsBatch(body: unknown): Promise<{ insertedCount: number }> {
-    const parsedBody = this.parseCreateLogsBody(body);
+  async createLogsBatch(
+    body: unknown,
+    scope?: { organizationId: string; applicationId: string }
+  ): Promise<{ insertedCount: number }> {
+    const parsedBody = this.parseCreateLogsBody(body, scope);
 
     const insertedCount = await this.logsRepository.createBatch(
       parsedBody.organizationId,
@@ -373,21 +376,22 @@ export class LogsService {
     };
   }
 
-  private parseCreateLogsBody(input: unknown): {
+  private parseCreateLogsBody(
+    input: unknown,
+    scope?: { organizationId: string; applicationId: string }
+  ): {
     organizationId: string;
     applicationId: string;
     logs: CreateLogInput[];
   } {
     const body = input as CreateLogsBatchRequest;
 
-    const organizationId = this.requireString(
-      body.organizationId,
-      "organizationId is required"
-    );
-    const applicationId = this.requireString(
-      body.applicationId,
-      "applicationId is required"
-    );
+    const organizationId = scope?.organizationId
+      ? this.requireString(scope.organizationId, "organizationId is required")
+      : this.requireString(body.organizationId, "organizationId is required");
+    const applicationId = scope?.applicationId
+      ? this.requireString(scope.applicationId, "applicationId is required")
+      : this.requireString(body.applicationId, "applicationId is required");
 
     if (!Array.isArray(body.logs) || body.logs.length === 0) {
       throw new RequestError("logs must be a non-empty array");

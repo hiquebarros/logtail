@@ -15,6 +15,20 @@ function getActiveOrganizationId(request: FastifyRequest): string {
   return organizationId;
 }
 
+function getIngestionScope(request: FastifyRequest): {
+  organizationId: string;
+  applicationId: string;
+} {
+  const scope = request.ingestionAuth;
+  if (!scope?.organizationId || !scope.applicationId) {
+    const error = new Error("Unauthorized") as Error & { statusCode: number };
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return scope;
+}
+
 function getOptionalString(source: unknown, key: string): string | undefined {
   if (!source || typeof source !== "object") {
     return undefined;
@@ -87,20 +101,20 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
 
   app.post(
     "/logs",
-    { preHandler: [app.authenticate] },
+    { preHandler: [app.authenticateIngestion] },
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const organizationId = getActiveOrganizationId(request);
+      const { organizationId, applicationId } = getIngestionScope(request);
       const requestedApplicationId = getOptionalString(request.body, "applicationId");
-      const applicationId = await logsService.resolveAccessibleApplicationId(
-        organizationId,
-        requestedApplicationId
-      );
-      const scopedBody = {
-        ...(request.body as Record<string, unknown>),
+      if (requestedApplicationId && requestedApplicationId !== applicationId) {
+        reply
+          .code(403)
+          .send({ message: "applicationId does not match bearer token scope" });
+        return;
+      }
+      const result = await logsService.createLogsBatch(request.body, {
         organizationId,
         applicationId
-      };
-      const result = await logsService.createLogsBatch(scopedBody);
+      });
       reply.code(201).send(result);
     }
   );

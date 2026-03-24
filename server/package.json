@@ -8,6 +8,7 @@
     "prisma:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "build": "tsc -p tsconfig.json",
+    "test": "set DATABASE_URL=postgresql://logtail:logtail@localhost:5432/logtail&& tsx --test src/**/*.test.ts",
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts"
   },

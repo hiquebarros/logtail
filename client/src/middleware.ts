@@ -3,6 +3,16 @@ import { NextRequest, NextResponse } from "next/server";
 const LOGIN_PATH = "/login";
 const DEFAULT_AUTHENTICATED_PATH = "/logs";
 
+function isPublicIngestionApi(request: NextRequest): boolean {
+  const { pathname } = request.nextUrl;
+  if (request.method !== "POST") {
+    return false;
+  }
+
+  const match = pathname.match(/^\/api\/logs\/([^/]+)$/);
+  return Boolean(match?.[1]);
+}
+
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   const response = await fetch(new URL("/api/auth/me", request.url), {
     method: "GET",
@@ -17,6 +27,10 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+
+  if (isPublicIngestionApi(request)) {
+    return NextResponse.next();
+  }
 
   // Keep auth APIs public so login/logout can run.
   if (pathname.startsWith("/api/auth")) {

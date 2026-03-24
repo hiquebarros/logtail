@@ -1,6 +1,6 @@
 "use client";
 
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LogFiltersBar } from "@/components/filters/log-filters-bar";
@@ -8,12 +8,14 @@ import { LogTimeline } from "@/components/logs/LogTimeline";
 import { LogDetailsPanel } from "@/components/log-viewer/log-details-panel";
 import { LogEmptyState } from "@/components/log-viewer/log-empty-state";
 import { LogList } from "@/components/log-viewer/log-list";
-import { fetchLogsPage } from "@/lib/api/client";
+import { fetchLogsPage, fetchSources } from "@/lib/api/client";
 import type { Log, LogFilters, LogLevel } from "@/lib/types/logs";
+import type { Source } from "@/lib/types/sources";
 import { buildRelativeTimeRange, microsStringToMs, nowMicros } from "@/lib/utils/time-range";
 
 function buildDefaultFilters(): LogFilters {
   return {
+    applicationId: undefined,
     query: "",
     levels: [],
     services: [],
@@ -62,6 +64,7 @@ function parseTimeRangeFromParams(params: URLSearchParams): LogFilters["timeRang
 
 function parseFiltersFromParams(params: URLSearchParams): LogFilters {
   return {
+    applicationId: params.get("applicationId")?.trim() || undefined,
     query: params.get("query")?.trim() ?? "",
     levels: parseCsv(params.get("levels"), isLogLevel),
     services:
@@ -82,6 +85,9 @@ function buildFiltersParams(filters: LogFilters): URLSearchParams {
 
   if (filters.query.trim().length > 0) {
     params.set("query", filters.query.trim());
+  }
+  if (filters.applicationId) {
+    params.set("applicationId", filters.applicationId);
   }
   if (filters.levels.length > 0) {
     params.set("levels", filters.levels.join(","));
@@ -108,6 +114,7 @@ export function LogsPageClient() {
     [searchParams],
   );
   const [filters, setFilters] = useState<LogFilters>(initialFilters);
+  const hasApplicationSelected = Boolean(filters.applicationId);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
   const [live, setLive] = useState(false);
@@ -148,7 +155,13 @@ export function LogsPageClient() {
       }),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     initialPageParam: null as string | null,
+    enabled: hasApplicationSelected,
   });
+  const sourcesQuery = useQuery({
+    queryKey: ["sources"],
+    queryFn: fetchSources,
+  });
+  const sources = useMemo<Source[]>(() => sourcesQuery.data?.data ?? [], [sourcesQuery.data?.data]);
 
   const handleReachEnd = useCallback(() => {
     if (!logsQuery.hasNextPage || logsQuery.isFetchingNextPage) return;
@@ -176,9 +189,13 @@ export function LogsPageClient() {
   }, [isAtTop]);
 
   useEffect(() => {
-    if (!live) return;
+    if (!live || !filters.applicationId) return;
 
-    const eventSource = new EventSource("/api/logs/stream");
+    const streamUrl = new URL("/api/logs/stream", window.location.origin);
+    if (filters.applicationId) {
+      streamUrl.searchParams.set("applicationId", filters.applicationId);
+    }
+    const eventSource = new EventSource(streamUrl.toString());
     eventSource.addEventListener("log", (event) => {
       const next = JSON.parse((event as MessageEvent).data) as Log;
       setLiveLogs((current) => {
@@ -198,12 +215,15 @@ export function LogsPageClient() {
     return () => {
       eventSource.close();
     };
-  }, [live]);
+  }, [filters.applicationId, live]);
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
       <LogFiltersBar
         filters={filters}
+        sources={sources}
+        sourcesLoading={sourcesQuery.isLoading}
+        initiallyOpen={!initialFilters.applicationId}
         live={live}
         onLiveChange={(value) => {
           setLive(value);
@@ -217,19 +237,23 @@ export function LogsPageClient() {
         }}
       />
       <div className="border-b border-zinc-800 px-3 py-2">
-        <LogTimeline
-          filters={filters}
-          onRangeChange={(rf, rt) => {
-            setFilters((current) => ({
-              ...current,
-              timeRange: {
-                rf,
-                rt,
-              },
-            }));
-            setLiveLogs([]);
-          }}
-        />
+        {hasApplicationSelected ? (
+          <LogTimeline
+            filters={filters}
+            onRangeChange={(rf, rt) => {
+              setFilters((current) => ({
+                ...current,
+                timeRange: {
+                  rf,
+                  rt,
+                },
+              }));
+              setLiveLogs([]);
+            }}
+          />
+        ) : (
+          <div className="h-[120px] w-full rounded-md border border-zinc-800 bg-zinc-950" />
+        )}
       </div>
       <div
         className={`grid min-h-0 flex-1 overflow-hidden ${selectedLog ? "grid-cols-[1fr_560px]" : "grid-cols-[1fr]"}`}
@@ -244,7 +268,17 @@ export function LogsPageClient() {
               <span>Metadata</span>
             </div>
           ) : null}
-          {visibleLogs.length === 0 && !logsQuery.isLoading ? (
+          {!hasApplicationSelected ? (
+            <div className="flex flex-1 items-center justify-center px-6 text-center">
+              <div>
+                <p className="text-lg font-medium text-zinc-100">Start by choosing a source</p>
+                <p className="mt-2 text-sm text-zinc-400">
+                  Please use the top-left selector to choose the sources you&apos;d like to
+                  search logs from.
+                </p>
+              </div>
+            </div>
+          ) : visibleLogs.length === 0 && !logsQuery.isLoading ? (
             <LogEmptyState
               onSearchOneMoreDay={() => {
                 setFilters((current) => {

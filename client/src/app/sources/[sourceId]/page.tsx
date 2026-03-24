@@ -319,11 +319,10 @@ export default function SourceDetailsPage() {
                 <textarea
                   readOnly
                   value={verifyCommand}
-                  title="Copy to clipboard"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => void copyToClipboard(verifyCommand)}
                   rows={7}
-                  className="w-full resize-none cursor-pointer rounded-md border border-zinc-700 bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-300 opacity-90 outline-none focus:border-zinc-700 focus:outline-none focus:ring-0"
+                  className="w-full resize-none cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/70 p-3 font-mono text-xs leading-relaxed text-zinc-400 outline-none focus:border-zinc-800 focus:outline-none focus:ring-0"
                 />
                 <span className="pointer-events-none absolute -top-7 right-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] text-zinc-300 opacity-0 transition group-hover:opacity-100">
                   Click to copy

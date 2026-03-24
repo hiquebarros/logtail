@@ -16,6 +16,7 @@ export type LogTimeRange = {
 };
 
 export type LogFilters = {
+  applicationId?: string;
   query: string;
   levels: LogLevel[];
   services: string[];

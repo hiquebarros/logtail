@@ -13,6 +13,9 @@ function toParams(filters: LogFilters) {
     rf: filters.timeRange.rf,
     rt: filters.timeRange.rt,
   });
+  if (filters.applicationId) {
+    params.set("applicationId", filters.applicationId);
+  }
 
   if (filters.levels.length) params.set("levels", filters.levels.join(","));
   if (filters.services.length) params.set("services", filters.services.join(","));

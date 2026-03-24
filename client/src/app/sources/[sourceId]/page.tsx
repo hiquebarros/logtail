@@ -162,7 +162,7 @@ export default function SourceDetailsPage() {
   const verifyCommand = `curl -X POST \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer ${source.apiKey}' \\
-  -d '{"applicationId":"${source.id}","logs":[{"timestamp":"'"$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'","level":"info","message":"Hello from Logtail!","metadata":{"source":"curl"}}]}' \\
+  -d '{"applicationId":"${source.id}","logs":[{"timestamp":"'"$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'","level":"info","message":"Hello!","metadata":{"source":"curl"}}]}' \\
   ${ingestionHost}`;
 
   const copyToClipboard = async (text: string) => {
@@ -204,11 +204,7 @@ export default function SourceDetailsPage() {
           <div className="space-y-2">
             <h2 className="text-base font-semibold text-zinc-100">Basic information</h2>
             <p className="text-sm text-zinc-400">
-              Need help with the integration? Contact{" "}
-              <a className="underline" href="mailto:hello@betterstack.com">
-                hello@betterstack.com
-              </a>
-              .
+              Information needed to ingest logs into the platform.
             </p>
           </div>
 
@@ -292,11 +288,7 @@ export default function SourceDetailsPage() {
           <div className="space-y-2">
             <h2 className="text-base font-semibold text-zinc-100">Verify data collection</h2>
             <p className="text-sm text-zinc-400">
-              Need help?{" "}
-              <a className="underline" href="mailto:hello@betterstack.com">
-                Chat with an expert
-              </a>
-              .
+              Use this code example to verify that logs are being ingested into the platform.
             </p>
           </div>
 
@@ -305,7 +297,10 @@ export default function SourceDetailsPage() {
               <p className="text-zinc-200">Waiting for logs...</p>
               <p className="text-zinc-400">
                 Once logs arrive, verify them in{" "}
-                <Link className="text-cyan-300 underline underline-offset-2" href="/logs">
+                <Link
+                  className="text-cyan-300 underline underline-offset-2"
+                  href={`/logs?applicationId=${source.id}`}
+                >
                   Live Tail
                 </Link>
                 .

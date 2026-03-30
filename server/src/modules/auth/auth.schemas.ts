@@ -21,3 +21,15 @@ export const switchOrganizationSchema = z.object({
 });
 
 export type SwitchOrganizationInput = z.infer<typeof switchOrganizationSchema>;
+
+export const verifyEmailSchema = z.object({
+  token: z.string().trim().min(1).max(512)
+});
+
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+
+export const resendVerificationSchema = z.object({
+  email: z.string().email()
+});
+
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;

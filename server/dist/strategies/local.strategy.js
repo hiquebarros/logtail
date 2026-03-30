@@ -16,6 +16,9 @@ class LocalStrategy {
         if (!isValid) {
             throw new auth_service_1.AuthError("Invalid credentials");
         }
+        if (!user.emailVerifiedAt) {
+            throw new auth_service_1.AuthError("Please verify your email before signing in.", 403);
+        }
         return user;
     }
 }

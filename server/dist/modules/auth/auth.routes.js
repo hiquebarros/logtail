@@ -11,6 +11,8 @@ async function registerAuthRoutes(app) {
     app.register(async (authScope) => {
         authScope.post("/auth/login", authController.login);
         authScope.post("/auth/register", authController.register);
+        authScope.post("/auth/verify-email", authController.verifyEmail);
+        authScope.post("/auth/resend-verification", authController.resendVerification);
         authScope.post("/auth/logout", { preHandler: [authScope.authenticate] }, authController.logout);
         authScope.post("/auth/switch-organization", { preHandler: [authScope.authenticate] }, authController.switchOrganization);
         authScope.get("/auth/me", { preHandler: [authScope.authenticate] }, authController.me);

@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 
@@ -13,7 +14,7 @@ type MeResponse = {
   message?: string;
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -85,7 +86,7 @@ export default function LoginPage() {
       <section className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-6">
         <h1 className="mb-1 text-lg font-semibold text-zinc-100">Sign in</h1>
         <p className="mb-6 text-sm text-zinc-400">
-          Use your backend credentials to create a session.
+          Sign in to your Logtail account.
         </p>
 
         <form className="space-y-4" onSubmit={onSubmit}>
@@ -121,7 +122,28 @@ export default function LoginPage() {
             {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
+
+        <p className="mt-5 text-sm text-zinc-400">
+          New to Logtail?{" "}
+          <Link href="/register" className="text-cyan-300 hover:text-cyan-200">
+            Create account
+          </Link>
+        </p>
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-4">
+          <div className="text-sm text-zinc-400">Loading...</div>
+        </main>
+      }
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

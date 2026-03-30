@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.switchOrganizationSchema = exports.registerSchema = exports.loginSchema = void 0;
+exports.resendVerificationSchema = exports.verifyEmailSchema = exports.switchOrganizationSchema = exports.registerSchema = exports.loginSchema = void 0;
 const zod_1 = require("zod");
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
@@ -14,4 +14,10 @@ exports.registerSchema = zod_1.z.object({
 });
 exports.switchOrganizationSchema = zod_1.z.object({
     organizationId: zod_1.z.string().uuid()
+});
+exports.verifyEmailSchema = zod_1.z.object({
+    token: zod_1.z.string().trim().min(1).max(512)
+});
+exports.resendVerificationSchema = zod_1.z.object({
+    email: zod_1.z.string().email()
 });

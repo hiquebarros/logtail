@@ -1,7 +1,9 @@
 import { FastifyRequest } from "fastify";
 import { OrganizationMemberStatus, User } from "@prisma/client";
+import { createHash, randomBytes } from "crypto";
 import { prisma } from "../../prisma/client";
 import { comparePassword, hashPassword } from "../../utils/hash";
+import { EmailService } from "./email.service";
 
 export class AuthError extends Error {
   statusCode: number;
@@ -13,6 +15,8 @@ export class AuthError extends Error {
 }
 
 export class AuthService {
+  constructor(private readonly emailService = new EmailService()) {}
+
   async findUserByEmail(email: string): Promise<User | null> {
     return prisma.user.findUnique({
       where: { email }
@@ -92,6 +96,103 @@ export class AuthService {
     });
 
     return created;
+  }
+
+  async sendVerificationEmail(userId: string, appBaseUrl: string): Promise<void> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        emailVerifiedAt: true
+      }
+    });
+    if (!user) {
+      throw new AuthError("User not found", 404);
+    }
+    if (user.emailVerifiedAt) {
+      return;
+    }
+
+    const { token, tokenHash, expiresAt } = this.createEmailVerificationToken();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationTokenHash: tokenHash,
+        emailVerificationTokenExpiresAt: expiresAt
+      }
+    });
+
+    const verificationUrl = `${appBaseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+    await this.emailService.sendVerificationEmail({
+      toEmail: user.email,
+      toName: user.name,
+      verificationUrl
+    });
+  }
+
+  async resendVerificationByEmail(email: string, appBaseUrl: string): Promise<void> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.findUserByEmail(normalizedEmail);
+    if (!user || user.emailVerifiedAt) {
+      return;
+    }
+
+    await this.sendVerificationEmail(user.id, appBaseUrl);
+  }
+
+  async verifyEmailToken(token: string): Promise<User> {
+    const tokenHash = this.hashVerificationToken(token);
+    const user = await prisma.user.findFirst({
+      where: { emailVerificationTokenHash: tokenHash }
+    });
+
+    if (!user) {
+      throw new AuthError("Invalid verification link", 400);
+    }
+
+    if (
+      !user.emailVerificationTokenExpiresAt ||
+      user.emailVerificationTokenExpiresAt.getTime() < Date.now()
+    ) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerificationTokenHash: null,
+          emailVerificationTokenExpiresAt: null
+        }
+      });
+      throw new AuthError("Verification link expired. Please request a new one.", 400);
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationTokenHash: null,
+        emailVerificationTokenExpiresAt: null
+      }
+    });
+
+    return updatedUser;
+  }
+
+  private createEmailVerificationToken(): {
+    token: string;
+    tokenHash: string;
+    expiresAt: Date;
+  } {
+    const token = randomBytes(32).toString("hex");
+    return {
+      token,
+      tokenHash: this.hashVerificationToken(token),
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
+    };
+  }
+
+  private hashVerificationToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
   }
 
   async getActiveMembershipForUser(

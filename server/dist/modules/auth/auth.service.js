@@ -2,8 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = exports.AuthError = void 0;
 const client_1 = require("@prisma/client");
+const crypto_1 = require("crypto");
 const client_2 = require("../../prisma/client");
 const hash_1 = require("../../utils/hash");
+const email_service_1 = require("./email.service");
 class AuthError extends Error {
     constructor(message, statusCode = 401) {
         super(message);
@@ -12,6 +14,9 @@ class AuthError extends Error {
 }
 exports.AuthError = AuthError;
 class AuthService {
+    constructor(emailService = new email_service_1.EmailService()) {
+        this.emailService = emailService;
+    }
     async findUserByEmail(email) {
         return client_2.prisma.user.findUnique({
             where: { email }
@@ -69,6 +74,85 @@ class AuthService {
             return { user, organizationId: organization.id };
         });
         return created;
+    }
+    async sendVerificationEmail(userId, appBaseUrl) {
+        const user = await client_2.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                name: true,
+                emailVerifiedAt: true
+            }
+        });
+        if (!user) {
+            throw new AuthError("User not found", 404);
+        }
+        if (user.emailVerifiedAt) {
+            return;
+        }
+        const { token, tokenHash, expiresAt } = this.createEmailVerificationToken();
+        await client_2.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                emailVerificationTokenHash: tokenHash,
+                emailVerificationTokenExpiresAt: expiresAt
+            }
+        });
+        const verificationUrl = `${appBaseUrl.replace(/\/$/, "")}/verify-email?token=${encodeURIComponent(token)}`;
+        await this.emailService.sendVerificationEmail({
+            toEmail: user.email,
+            toName: user.name,
+            verificationUrl
+        });
+    }
+    async resendVerificationByEmail(email, appBaseUrl) {
+        const normalizedEmail = email.trim().toLowerCase();
+        const user = await this.findUserByEmail(normalizedEmail);
+        if (!user || user.emailVerifiedAt) {
+            return;
+        }
+        await this.sendVerificationEmail(user.id, appBaseUrl);
+    }
+    async verifyEmailToken(token) {
+        const tokenHash = this.hashVerificationToken(token);
+        const user = await client_2.prisma.user.findFirst({
+            where: { emailVerificationTokenHash: tokenHash }
+        });
+        if (!user) {
+            throw new AuthError("Invalid verification link", 400);
+        }
+        if (!user.emailVerificationTokenExpiresAt ||
+            user.emailVerificationTokenExpiresAt.getTime() < Date.now()) {
+            await client_2.prisma.user.update({
+                where: { id: user.id },
+                data: {
+                    emailVerificationTokenHash: null,
+                    emailVerificationTokenExpiresAt: null
+                }
+            });
+            throw new AuthError("Verification link expired. Please request a new one.", 400);
+        }
+        const updatedUser = await client_2.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                emailVerifiedAt: new Date(),
+                emailVerificationTokenHash: null,
+                emailVerificationTokenExpiresAt: null
+            }
+        });
+        return updatedUser;
+    }
+    createEmailVerificationToken() {
+        const token = (0, crypto_1.randomBytes)(32).toString("hex");
+        return {
+            token,
+            tokenHash: this.hashVerificationToken(token),
+            expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24)
+        };
+    }
+    hashVerificationToken(token) {
+        return (0, crypto_1.createHash)("sha256").update(token).digest("hex");
     }
     async getActiveMembershipForUser(userId, requestedOrganizationId) {
         const memberships = await client_2.prisma.organizationMember.findMany({

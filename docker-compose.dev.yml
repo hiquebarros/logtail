@@ -13,6 +13,8 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
       NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-4000-8000-000000000001}
       NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-4000-8000-000000000001}
+    ports:
+      - "3000:3000"
     volumes:
       - ./client:/app
       - client_node_modules:/app/node_modules
@@ -36,6 +38,8 @@ services:
       DB_NAME: ${DB_NAME:-logtail}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+    ports:
+      - "3001:3001"
     volumes:
       - ./server:/app
       - server_node_modules:/app/node_modules
@@ -44,7 +48,25 @@ services:
       db:
         condition: service_healthy
 
+  db:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-logtail}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-logtail}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   client_node_modules:
   client_next:
   server_node_modules:
+  postgres_data:

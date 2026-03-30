@@ -2,18 +2,18 @@
 
 import Link from "next/link";
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 type ApiMessage = {
   message?: string;
 };
 
 function VerifyEmailPageContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = useMemo(() => searchParams.get("token") || "", [searchParams]);
   const [email, setEmail] = useState("");
   const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [isVerified, setIsVerified] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
@@ -45,7 +45,8 @@ function VerifyEmailPageContent() {
       return;
     }
 
-    router.replace("/logs");
+    setIsVerified(true);
+    setIsVerifying(false);
   };
 
   useEffect(() => {
@@ -88,7 +89,9 @@ function VerifyEmailPageContent() {
         <p className="mb-6 text-sm text-zinc-400">
           {isVerifying
             ? "We are confirming your account now."
-            : "Confirm your account to start using Logtail."}
+            : isVerified
+              ? "Thanks for verifying your email."
+              : "Confirm your account to start using Logtail."}
         </p>
 
         {isVerifying ? (
@@ -97,11 +100,25 @@ function VerifyEmailPageContent() {
           </div>
         ) : null}
 
+        {isVerified ? (
+          <div className="space-y-3">
+            <p className="text-sm text-emerald-300">
+              Your account is verified and ready to use.
+            </p>
+            <Link
+              href="/logs"
+              className="flex h-10 w-full items-center justify-center rounded-md bg-cyan-600 text-sm font-medium text-white transition hover:bg-cyan-500"
+            >
+              Access application
+            </Link>
+          </div>
+        ) : null}
+
         {verifyError ? <p className="mb-4 text-sm text-rose-300">{verifyError}</p> : null}
 
-        {!isVerifying ? <div className="my-4 border-t border-zinc-800" /> : null}
+        {!isVerifying && !isVerified ? <div className="my-4 border-t border-zinc-800" /> : null}
 
-        {!isVerifying ? (
+        {!isVerifying && !isVerified ? (
           <form className="space-y-3" onSubmit={onResend}>
             <p className="text-sm text-zinc-300">Need a new verification link?</p>
             <label className="block space-y-1">

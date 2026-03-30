@@ -25,6 +25,10 @@ export class LocalStrategy implements AuthStrategy<LocalStrategyInput, User> {
       throw new AuthError("Invalid credentials");
     }
 
+    if (!user.emailVerifiedAt) {
+      throw new AuthError("Please verify your email before signing in.", 403);
+    }
+
     return user;
   }
 }

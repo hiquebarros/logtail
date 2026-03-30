@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 type NavItem = {
   label: string;
   href: string;
-  icon: JSX.Element;
+  icon: ReactElement;
 };
 
 type MainSection = "telemetry" | "configurations";
@@ -16,7 +17,7 @@ type MainSectionItem = {
   key: MainSection;
   label: string;
   href: string;
-  icon: JSX.Element;
+  icon: ReactElement;
 };
 
 const mainSections: MainSectionItem[] = [
@@ -109,7 +110,7 @@ function MainSectionLink({
   );
 }
 
-function IconWrap({ children }: { children: React.ReactNode }) {
+function IconWrap({ children }: { children: ReactNode }) {
   return <span className="inline-flex h-5 w-5 items-center justify-center">{children}</span>;
 }
 

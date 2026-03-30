@@ -1,5 +1,11 @@
 import { FastifyReply, FastifyRequest } from "fastify";
-import { loginSchema, registerSchema, switchOrganizationSchema } from "./auth.schemas";
+import {
+  loginSchema,
+  registerSchema,
+  resendVerificationSchema,
+  switchOrganizationSchema,
+  verifyEmailSchema
+} from "./auth.schemas";
 import { AuthError, AuthService } from "./auth.service";
 import { LocalStrategy } from "../../strategies/local.strategy";
 
@@ -73,21 +79,61 @@ export class AuthController {
 
     try {
       const created = await this.authService.createUserWithOrganization(parsed.data);
-      await this.authService.createUserSession(
-        request,
-        created.user,
-        created.organizationId
-      );
+      await this.authService.sendVerificationEmail(created.user.id, this.getAppBaseUrl());
 
       reply.code(201).send({
         success: true,
+        message: "Account created. Check your inbox to verify your email before signing in.",
+        user: { id: created.user.id, email: created.user.email }
+      });
+    } catch (error) {
+      if (error instanceof AuthError) {
+        reply.code(error.statusCode).send({ message: error.message });
+        return;
+      }
+
+      throw error;
+    }
+  };
+
+  verifyEmail = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<void> => {
+    const parsed = verifyEmailSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400).send({
+        message: "Invalid request body",
+        issues: parsed.error.flatten()
+      });
+      return;
+    }
+
+    try {
+      const user = await this.authService.verifyEmailToken(parsed.data.token);
+      const activeMembership = await this.authService.getActiveMembershipForUser(user.id);
+      if (!activeMembership) {
+        reply.code(403).send({ message: "User has no active organization membership" });
+        return;
+      }
+
+      await this.authService.createUserSession(
+        request,
+        user,
+        activeMembership.organizationId
+      );
+
+      reply.send({
+        success: true,
+        message: "Email verified. Your account is ready.",
         user: {
-          id: created.user.id,
-          email: created.user.email,
-          name: created.user.name
+          id: user.id,
+          email: user.email
         },
         activeOrganization: {
-          id: created.organizationId
+          id: activeMembership.organizationId,
+          name: activeMembership.organizationName,
+          role: activeMembership.role
         }
       });
     } catch (error) {
@@ -98,6 +144,30 @@ export class AuthController {
 
       throw error;
     }
+  };
+
+  resendVerification = async (
+    request: FastifyRequest,
+    reply: FastifyReply
+  ): Promise<void> => {
+    const parsed = resendVerificationSchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400).send({
+        message: "Invalid request body",
+        issues: parsed.error.flatten()
+      });
+      return;
+    }
+
+    await this.authService.resendVerificationByEmail(
+      parsed.data.email,
+      this.getAppBaseUrl()
+    );
+    reply.send({
+      success: true,
+      message:
+        "If an account with that email exists and is not verified, we sent a confirmation link."
+    });
   };
 
   logout = async (
@@ -179,4 +249,14 @@ export class AuthController {
       activeOrganization: context.activeOrganization
     });
   };
+
+  private getAppBaseUrl(): string {
+    return (
+      process.env.FRONTEND_URL ||
+      process.env.CLIENT_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      "http://localhost:3000"
+    );
+  }
 }

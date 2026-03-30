@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const LOGIN_PATH = "/login";
+const REGISTER_PATH = "/register";
+const VERIFY_EMAIL_PATH = "/verify-email";
 const DEFAULT_AUTHENTICATED_PATH = "/logs";
 
 function isPublicIngestionApi(request: NextRequest): boolean {
@@ -27,6 +29,8 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
+  const isPublicPage =
+    pathname === LOGIN_PATH || pathname === REGISTER_PATH || pathname === VERIFY_EMAIL_PATH;
 
   if (isPublicIngestionApi(request)) {
     return NextResponse.next();
@@ -39,11 +43,11 @@ export async function middleware(request: NextRequest) {
 
   const authenticated = await isAuthenticated(request);
 
-  if (pathname === LOGIN_PATH && authenticated) {
+  if (isPublicPage && authenticated) {
     return NextResponse.redirect(new URL(DEFAULT_AUTHENTICATED_PATH, request.url));
   }
 
-  if (!authenticated && pathname !== LOGIN_PATH) {
+  if (!authenticated && !isPublicPage) {
     const loginUrl = new URL(LOGIN_PATH, request.url);
     const nextPath = `${pathname}${search}`;
 

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createSource, fetchSources } from "@/lib/api/client";
 import type { SourceLanguage } from "@/lib/types/sources";
@@ -9,7 +10,7 @@ import type { SourceLanguage } from "@/lib/types/sources";
 type LanguageOption = {
   value: SourceLanguage;
   label: string;
-  icon: JSX.Element;
+  icon: ReactElement;
 };
 
 const LANGUAGE_OPTIONS: LanguageOption[] = [
@@ -28,7 +29,7 @@ function formatDateTime(value: string): string {
   return date.toLocaleString();
 }
 
-function IconWrap({ children }: { children: React.ReactNode }) {
+function IconWrap({ children }: { children: ReactNode }) {
   return (
     <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-zinc-300">
       {children}

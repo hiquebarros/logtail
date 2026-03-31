@@ -117,7 +117,6 @@ export function LogsPageClient() {
   const hasApplicationSelected = Boolean(filters.applicationId);
   const [selectedLog, setSelectedLog] = useState<Log | null>(null);
   const [liveLogs, setLiveLogs] = useState<Log[]>([]);
-  const [live, setLive] = useState(false);
   const [scrollToStartSignal, setScrollToStartSignal] = useState(0);
   const [isAtTop, setIsAtTop] = useState(true);
   const isAtTopRef = useRef(isAtTop);
@@ -125,15 +124,12 @@ export function LogsPageClient() {
   const currentUrlParams = searchParams.toString();
   const filtersParams = useMemo(() => buildFiltersParams(filters), [filters]);
   const filtersParamsString = filtersParams.toString();
-  const [rangeFromMs, rangeToMs] = useMemo(() => {
+  const [rangeFromMs] = useMemo(() => {
     try {
-      return [
-        microsStringToMs(filters.timeRange.rf),
-        microsStringToMs(filters.timeRange.rt),
-      ] as const;
+      return [microsStringToMs(filters.timeRange.rf)] as const;
     } catch {
       const fallback = buildRelativeTimeRange(120);
-      return [microsStringToMs(fallback.rf), microsStringToMs(fallback.rt)] as const;
+      return [microsStringToMs(fallback.rf)] as const;
     }
   }, [filters.timeRange.rf, filters.timeRange.rt]);
 
@@ -174,7 +170,7 @@ export function LogsPageClient() {
   );
 
   const logs = useMemo(() => [...liveLogs, ...baseLogs], [baseLogs, liveLogs]);
-  const effectiveRangeToMs = live ? Date.now() : rangeToMs;
+  const effectiveRangeToMs = Date.now();
   const visibleLogs = useMemo(
     () =>
       logs.filter((log) => {
@@ -189,33 +185,65 @@ export function LogsPageClient() {
   }, [isAtTop]);
 
   useEffect(() => {
-    if (!live || !filters.applicationId) return;
+    if (!filters.applicationId) return;
 
-    const streamUrl = new URL("/api/logs/stream", window.location.origin);
-    if (filters.applicationId) {
-      streamUrl.searchParams.set("applicationId", filters.applicationId);
-    }
-    const eventSource = new EventSource(streamUrl.toString());
-    eventSource.addEventListener("log", (event) => {
-      const next = JSON.parse((event as MessageEvent).data) as Log;
-      setLiveLogs((current) => {
-        const merged = [next, ...current];
-        return merged.length > 1000 ? merged.slice(0, 1000) : merged;
-      });
-      // Auto-scroll only when already following newest items at the top.
-      if (isAtTopRef.current) {
-        const now = Date.now();
-        if (now - lastAutoScrollAtRef.current >= 200) {
-          lastAutoScrollAtRef.current = now;
-          setScrollToStartSignal((value) => value + 1);
+    let socket: WebSocket | null = null;
+    let cancelled = false;
+
+    const connect = async (): Promise<void> => {
+      try {
+        const tokenResponse = await fetch(
+          `/api/logs/ws-token?applicationId=${encodeURIComponent(filters.applicationId ?? "")}`,
+          { cache: "no-store" },
+        );
+        if (!tokenResponse.ok || cancelled) {
+          return;
         }
+        const tokenPayload = (await tokenResponse.json()) as { token?: string };
+        if (!tokenPayload.token || cancelled) {
+          return;
+        }
+
+        const configuredApiBaseUrl = process.env.NEXT_PUBLIC_API_URL;
+        const effectiveApiBaseUrl =
+          !configuredApiBaseUrl || configuredApiBaseUrl.includes("://server:")
+            ? `${window.location.protocol}//${window.location.hostname}:3001`
+            : configuredApiBaseUrl;
+        const wsBaseUrl = effectiveApiBaseUrl.replace(/^http/i, "ws");
+        const wsUrl = new URL(`${wsBaseUrl}/logs/ws`);
+        wsUrl.searchParams.set("token", tokenPayload.token);
+
+        socket = new WebSocket(wsUrl.toString());
+        socket.onmessage = (event) => {
+          const payload = JSON.parse(event.data) as { type?: string; data?: Log };
+          if (payload.type !== "log" || !payload.data) {
+            return;
+          }
+
+          setLiveLogs((current) => {
+            const merged = [payload.data as Log, ...current];
+            return merged.length > 1000 ? merged.slice(0, 1000) : merged;
+          });
+          if (isAtTopRef.current) {
+            const now = Date.now();
+            if (now - lastAutoScrollAtRef.current >= 200) {
+              lastAutoScrollAtRef.current = now;
+              setScrollToStartSignal((value) => value + 1);
+            }
+          }
+        };
+      } catch {
+        // Ignore setup errors and wait for next dependency change to reconnect.
       }
-    });
+    };
+
+    void connect();
 
     return () => {
-      eventSource.close();
+      cancelled = true;
+      socket?.close();
     };
-  }, [filters.applicationId, live]);
+  }, [filters.applicationId]);
 
   return (
     <main className="flex h-dvh flex-col overflow-hidden bg-zinc-950 text-zinc-100">
@@ -224,13 +252,6 @@ export function LogsPageClient() {
         sources={sources}
         sourcesLoading={sourcesQuery.isLoading}
         initiallyOpen={!initialFilters.applicationId}
-        live={live}
-        onLiveChange={(value) => {
-          setLive(value);
-          if (!value) {
-            setLiveLogs([]);
-          }
-        }}
         onChange={(next) => {
           setFilters(next);
           setLiveLogs([]);
@@ -317,7 +338,7 @@ export function LogsPageClient() {
               <LogList
                 logs={visibleLogs}
                 selectedLogId={selectedLog?.id ?? null}
-                hasMore={Boolean(logsQuery.hasNextPage) && !live}
+                hasMore={false}
                 isFetchingNextPage={logsQuery.isFetchingNextPage}
                 scrollToStartSignal={scrollToStartSignal}
                 onReachEnd={handleReachEnd}

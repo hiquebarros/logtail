@@ -118,7 +118,12 @@ export default function SourcesPage() {
       setName("");
       setLanguage("JS");
       setSubmitError(null);
-      router.push(`/sources/${payload.data.id}`);
+      const createdSourceId = payload.data.id?.trim();
+      if (!createdSourceId) {
+        setSubmitError("Source created but id is missing. Refresh and try again.");
+        return;
+      }
+      router.push(`/sources/${createdSourceId}`);
     },
     onError: (error) => {
       setSubmitError(error instanceof Error ? error.message : "Failed to create source");
@@ -162,19 +167,30 @@ export default function SourcesPage() {
             <span>API Key</span>
             <span>Created</span>
           </div>
-          {sourcesQuery.data.data.map((source) => (
-            <button
-              key={source.id}
-              type="button"
-              onClick={() => router.push(`/sources/${source.id}`)}
-              className="grid w-full grid-cols-[1fr_160px_1fr_210px] items-center border-b border-zinc-900 px-4 py-3 text-left text-sm transition hover:bg-zinc-900/50 last:border-b-0"
-            >
-              <span className="text-zinc-100">{source.name}</span>
-              <span className="text-zinc-300">{source.language}</span>
-              <span className="truncate font-mono text-xs text-zinc-400">{source.apiKey}</span>
-              <span className="text-zinc-400">{formatDateTime(source.createdAt)}</span>
-            </button>
-          ))}
+          {sourcesQuery.data.data.map((source) => {
+            const sourceId = source.id?.trim() ?? "";
+            const canOpenDetails = sourceId.length > 0;
+
+            return (
+              <button
+                key={`${source.id}-${source.name}`}
+                type="button"
+                disabled={!canOpenDetails}
+                onClick={() => {
+                  if (!canOpenDetails) {
+                    return;
+                  }
+                  router.push(`/sources/${sourceId}`);
+                }}
+                className="grid w-full grid-cols-[1fr_160px_1fr_210px] items-center border-b border-zinc-900 px-4 py-3 text-left text-sm transition enabled:hover:bg-zinc-900/50 disabled:cursor-not-allowed disabled:opacity-70 last:border-b-0"
+              >
+                <span className="text-zinc-100">{source.name}</span>
+                <span className="text-zinc-300">{source.language}</span>
+                <span className="truncate font-mono text-xs text-zinc-400">{source.apiKey}</span>
+                <span className="text-zinc-400">{formatDateTime(source.createdAt)}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 

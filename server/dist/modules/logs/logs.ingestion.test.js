@@ -7,13 +7,13 @@ const strict_1 = __importDefault(require("node:assert/strict"));
 const node_test_1 = __importDefault(require("node:test"));
 const fastify_1 = __importDefault(require("fastify"));
 const auth_1 = require("../../plugins/auth");
-const logs_controller_1 = require("./logs.controller");
-const logs_service_1 = require("./logs.service");
+const ingestion_controller_1 = require("../ingestion/ingestion.controller");
+const ingestion_producer_1 = require("../ingestion/ingestion.producer");
 const client_1 = require("../../prisma/client");
 async function buildTestApp() {
     const app = (0, fastify_1.default)();
     await (0, auth_1.registerAuthPlugin)(app);
-    await (0, logs_controller_1.registerLogsController)(app);
+    await (0, ingestion_controller_1.registerIngestionController)(app);
     return app;
 }
 (0, node_test_1.default)("POST /logs returns 401 without bearer token", async () => {
@@ -35,15 +35,15 @@ async function buildTestApp() {
         await app.close();
     }
 });
-(0, node_test_1.default)("POST /logs returns 201 with valid bearer token", async () => {
+(0, node_test_1.default)("POST /logs returns 202 with valid bearer token", async () => {
     const originalFindUnique = client_1.prisma.application.findUnique;
-    const originalCreateLogsBatch = logs_service_1.LogsService.prototype.createLogsBatch;
+    const originalEnqueueBatch = ingestion_producer_1.IngestionProducer.prototype.enqueueBatch;
     client_1.prisma.application.findUnique = (async () => ({
         id: "20000000-0000-4000-8000-000000000001",
         organizationId: "10000000-0000-4000-8000-000000000001"
     }));
-    logs_service_1.LogsService.prototype.createLogsBatch = (async () => ({
-        insertedCount: 1
+    ingestion_producer_1.IngestionProducer.prototype.enqueueBatch = (async () => ({
+        jobId: "test-job-id"
     }));
     const app = await buildTestApp();
     try {
@@ -58,12 +58,12 @@ async function buildTestApp() {
                 logs: [{ timestamp: "2026-03-23T12:00:00.000Z", level: "info", message: "hello" }]
             }
         });
-        strict_1.default.equal(response.statusCode, 201);
-        strict_1.default.deepEqual(response.json(), { insertedCount: 1 });
+        strict_1.default.equal(response.statusCode, 202);
+        strict_1.default.deepEqual(response.json(), { accepted: true, jobId: "test-job-id" });
     }
     finally {
         client_1.prisma.application.findUnique = originalFindUnique;
-        logs_service_1.LogsService.prototype.createLogsBatch = originalCreateLogsBatch;
+        ingestion_producer_1.IngestionProducer.prototype.enqueueBatch = originalEnqueueBatch;
         await app.close();
     }
 });

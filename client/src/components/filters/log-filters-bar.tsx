@@ -10,8 +10,6 @@ type Props = {
   sources: Source[];
   sourcesLoading: boolean;
   initiallyOpen?: boolean;
-  live: boolean;
-  onLiveChange: (value: boolean) => void;
   onChange: (next: LogFilters) => void;
 };
 
@@ -22,8 +20,6 @@ export function LogFiltersBar({
   sources,
   sourcesLoading,
   initiallyOpen = false,
-  live,
-  onLiveChange,
   onChange,
 }: Props) {
   const queryInputRef = useRef<HTMLInputElement | null>(null);
@@ -170,17 +166,6 @@ export function LogFiltersBar({
           Search
         </button>
         <TimeRangePicker filters={filters} onChange={onChange} />
-        <button
-          type="button"
-          onClick={() => onLiveChange(!live)}
-          className={`h-9 cursor-pointer rounded-md border px-3 text-sm font-medium transition ${
-            live
-              ? "border-emerald-500/50 bg-emerald-600/20 text-emerald-300"
-              : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
-          }`}
-        >
-          Live
-        </button>
       </div>
 
     </div>

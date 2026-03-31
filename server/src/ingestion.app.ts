@@ -1,12 +1,8 @@
 import Fastify, { FastifyInstance } from "fastify";
-import websocket from "@fastify/websocket";
 import { registerAuthPlugin } from "./plugins/auth";
-import { registerSessionPlugin } from "./plugins/session";
-import { registerAuthRoutes } from "./modules/auth/auth.routes";
-import { registerLogsController } from "./modules/logs/logs.controller";
-import { registerSourcesController } from "./modules/sources/sources.controller";
+import { registerIngestionController } from "./modules/ingestion/ingestion.controller";
 
-export async function buildApp(): Promise<FastifyInstance> {
+export async function buildIngestionApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -26,12 +22,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     return { status: "ok" };
   });
 
-  await app.register(websocket);
-  await registerSessionPlugin(app);
   await registerAuthPlugin(app);
-  await registerAuthRoutes(app);
-  await registerLogsController(app);
-  await registerSourcesController(app);
+  await registerIngestionController(app);
 
   return app;
 }

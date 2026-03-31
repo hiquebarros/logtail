@@ -13,6 +13,7 @@ services:
         required: false
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
+      NEXT_PUBLIC_INGESTION_API_URL: ${NEXT_PUBLIC_INGESTION_API_URL:-http://ingest-api:3002}
       NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-4000-8000-000000000001}
       NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-4000-8000-000000000001}
     depends_on:
@@ -34,6 +35,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${PORT:-3001}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
@@ -41,11 +43,70 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-postgres}
       DB_NAME: ${DB_NAME:-logtail}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
-      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-env}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
     command: sh -c "npm run prisma:migrate && npm run start"
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  ingest-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: runner
+    container_name: logtail-ingest-api
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      NODE_ENV: production
+      INGESTION_PORT: ${INGESTION_PORT:-3002}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+    command: sh -c "npm run prisma:migrate && npm run start:ingestion"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  ingest-worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: runner
+    container_name: logtail-ingest-worker
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      NODE_ENV: production
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      INGESTION_WORKER_CONCURRENCY: ${INGESTION_WORKER_CONCURRENCY:-20}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+    command: sh -c "npm run prisma:migrate && npm run worker:ingestion"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   db:
     image: postgres:16-alpine
@@ -64,6 +125,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: logtail-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
 
 volumes:
   postgres_data:

@@ -2,17 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify, { FastifyInstance } from "fastify";
 import { registerAuthPlugin } from "../../plugins/auth";
-import { registerLogsController } from "./logs.controller";
-import { LogsService } from "./logs.service";
+import { registerIngestionController } from "../ingestion/ingestion.controller";
+import { IngestionProducer } from "../ingestion/ingestion.producer";
 import { prisma } from "../../prisma/client";
 
-type CreateLogsBatchFn = LogsService["createLogsBatch"];
 type FindApplicationByApiKeyFn = typeof prisma.application.findUnique;
+type EnqueueBatchFn = IngestionProducer["enqueueBatch"];
 
 async function buildTestApp(): Promise<FastifyInstance> {
   const app = Fastify();
   await registerAuthPlugin(app);
-  await registerLogsController(app);
+  await registerIngestionController(app);
   return app;
 }
 
@@ -37,17 +37,18 @@ test("POST /logs returns 401 without bearer token", async () => {
   }
 });
 
-test("POST /logs returns 201 with valid bearer token", async () => {
+test("POST /logs returns 202 with valid bearer token", async () => {
   const originalFindUnique = prisma.application.findUnique as FindApplicationByApiKeyFn;
-  const originalCreateLogsBatch = LogsService.prototype.createLogsBatch as CreateLogsBatchFn;
+  const originalEnqueueBatch =
+    IngestionProducer.prototype.enqueueBatch as EnqueueBatchFn;
 
   prisma.application.findUnique = (async () => ({
     id: "20000000-0000-4000-8000-000000000001",
     organizationId: "10000000-0000-4000-8000-000000000001"
   })) as unknown as FindApplicationByApiKeyFn;
-  LogsService.prototype.createLogsBatch = (async () => ({
-    insertedCount: 1
-  })) as unknown as CreateLogsBatchFn;
+  IngestionProducer.prototype.enqueueBatch = (async () => ({
+    jobId: "test-job-id"
+  })) as unknown as EnqueueBatchFn;
 
   const app = await buildTestApp();
   try {
@@ -63,11 +64,11 @@ test("POST /logs returns 201 with valid bearer token", async () => {
       }
     });
 
-    assert.equal(response.statusCode, 201);
-    assert.deepEqual(response.json(), { insertedCount: 1 });
+    assert.equal(response.statusCode, 202);
+    assert.deepEqual(response.json(), { accepted: true, jobId: "test-job-id" });
   } finally {
     prisma.application.findUnique = originalFindUnique;
-    LogsService.prototype.createLogsBatch = originalCreateLogsBatch;
+    IngestionProducer.prototype.enqueueBatch = originalEnqueueBatch;
     await app.close();
   }
 });

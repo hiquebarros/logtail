@@ -11,6 +11,7 @@ services:
       WATCHPACK_POLLING: "true"
       CHOKIDAR_USEPOLLING: "true"
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
+      NEXT_PUBLIC_INGESTION_API_URL: ${NEXT_PUBLIC_INGESTION_API_URL:-http://ingest-api:3002}
       NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-4000-8000-000000000001}
       NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-4000-8000-000000000001}
     ports:
@@ -30,6 +31,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: ${PORT:-3001}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-5432}
@@ -47,6 +49,63 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
+
+  ingest-api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      INGESTION_PORT: ${INGESTION_PORT:-3002}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+      SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./server:/app
+      - server_node_modules:/app/node_modules
+    command: sh -c "npm ci && npm run prisma:generate && npm run dev:ingestion"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  ingest-worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: dev
+    restart: "no"
+    environment:
+      NODE_ENV: development
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      INGESTION_WORKER_CONCURRENCY: ${INGESTION_WORKER_CONCURRENCY:-20}
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+    volumes:
+      - ./server:/app
+      - server_node_modules:/app/node_modules
+    command: sh -c "npm ci && npm run prisma:generate && npm run worker:ingestion:dev"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   db:
     image: postgres:16-alpine
@@ -64,6 +123,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: "no"
+    ports:
+      - "6379:6379"
 
 volumes:
   client_node_modules:

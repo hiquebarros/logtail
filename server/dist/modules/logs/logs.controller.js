@@ -13,15 +13,6 @@ function getActiveOrganizationId(request) {
     }
     return organizationId;
 }
-function getIngestionScope(request) {
-    const scope = request.ingestionAuth;
-    if (!scope?.organizationId || !scope.applicationId) {
-        const error = new Error("Unauthorized");
-        error.statusCode = 401;
-        throw error;
-    }
-    return scope;
-}
 function getOptionalString(source, key) {
     if (!source || typeof source !== "object") {
         return undefined;
@@ -65,21 +56,6 @@ async function registerLogsController(app) {
         };
         const result = await logsService.getMetrics(scopedQuery);
         reply.send(result);
-    });
-    app.post("/logs", { preHandler: [app.authenticateIngestion] }, async (request, reply) => {
-        const { organizationId, applicationId } = getIngestionScope(request);
-        const requestedApplicationId = getOptionalString(request.body, "applicationId");
-        if (requestedApplicationId && requestedApplicationId !== applicationId) {
-            reply
-                .code(403)
-                .send({ message: "applicationId does not match bearer token scope" });
-            return;
-        }
-        const result = await logsService.createLogsBatch(request.body, {
-            organizationId,
-            applicationId
-        });
-        reply.code(201).send(result);
     });
     app.get("/logs/stream", { preHandler: [app.authenticate] }, async (request, reply) => {
         const organizationId = getActiveOrganizationId(request);

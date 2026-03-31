@@ -1,0 +1,47 @@
+services:
+  migrate:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      target: runner
+    container_name: logtail-migrate
+    restart: "no"
+    env_file:
+      - path: ./.env
+        required: false
+    environment:
+      NODE_ENV: production
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-logtail}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
+    command: sh -c "npm run prisma:migrate"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  server:
+    command: sh -c "npm run start"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ingest-api:
+    command: sh -c "npm run start:ingestion"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  ingest-worker:
+    command: sh -c "npm run worker:ingestion"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  db:
+    ports: !reset []
+
+  redis:
+    ports: !reset []

@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildApp = buildApp;
 const fastify_1 = __importDefault(require("fastify"));
+const websocket_1 = __importDefault(require("@fastify/websocket"));
 const auth_1 = require("./plugins/auth");
 const session_1 = require("./plugins/session");
 const auth_routes_1 = require("./modules/auth/auth.routes");
@@ -24,6 +25,7 @@ async function buildApp() {
     app.get("/health", async () => {
         return { status: "ok" };
     });
+    await app.register(websocket_1.default);
     await (0, session_1.registerSessionPlugin)(app);
     await (0, auth_1.registerAuthPlugin)(app);
     await (0, auth_routes_1.registerAuthRoutes)(app);

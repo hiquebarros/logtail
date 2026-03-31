@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { LogsRepository } from "./logs.repository";
 import { LogsService } from "./logs.service";
+import { issueLiveTailToken, verifyLiveTailToken } from "./logs.live-token";
 
 const logsService = new LogsService(new LogsRepository());
 
@@ -46,6 +47,24 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
   );
 
   app.get(
+    "/logs/ws-token",
+    { preHandler: [app.authenticate] },
+    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+      const organizationId = getActiveOrganizationId(request);
+      const requestedApplicationId = getOptionalString(request.query, "applicationId");
+      const applicationId = await logsService.resolveAccessibleApplicationId(
+        organizationId,
+        requestedApplicationId
+      );
+      const token = issueLiveTailToken({
+        organizationId,
+        applicationId
+      });
+      reply.send({ token });
+    }
+  );
+
+  app.get(
     "/logs/histogram",
     { preHandler: [app.authenticate] },
     async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -86,19 +105,25 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
   );
 
   app.get(
-    "/logs/stream",
-    { preHandler: [app.authenticate] },
-    async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const organizationId = getActiveOrganizationId(request);
-      const requestedApplicationId = getOptionalString(request.query, "applicationId");
-      const applicationId = await logsService.resolveAccessibleApplicationId(
-        organizationId,
-        requestedApplicationId
-      );
+    "/logs/ws",
+    { websocket: true },
+    (socket, request): void => {
+      const token = getOptionalString(request.query, "token");
+      const tokenPayload = token ? verifyLiveTailToken(token) : null;
+      if (!tokenPayload) {
+        socket.send(
+          JSON.stringify({
+            type: "error",
+            message: "Unauthorized"
+          })
+        );
+        socket.close(1008, "Unauthorized");
+        return;
+      }
+
       const streamFilters = logsService.parseStreamFilters({
-        ...(request.query as Record<string, unknown>),
-        organizationId,
-        applicationId
+        organizationId: tokenPayload.organizationId,
+        applicationId: tokenPayload.applicationId
       });
       let lastCursor = {
         timestamp: new Date(),
@@ -106,43 +131,48 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
       };
       let polling = false;
 
-      reply.hijack();
-      reply.raw.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive"
-      });
-
-      const writeEvent = (event: string, data: unknown): void => {
-        reply.raw.write(`event: ${event}\n`);
-        reply.raw.write(`data: ${JSON.stringify(data)}\n\n`);
+      const sendMessage = (payload: Record<string, unknown>): void => {
+        if (socket.readyState === 1) {
+          socket.send(JSON.stringify(payload));
+        }
       };
 
-      writeEvent("connected", { status: "ok" });
+      sendMessage({ type: "connected" });
 
       const poll = async (): Promise<void> => {
-        if (polling) {
+        if (polling || socket.readyState !== 1) {
           return;
         }
 
         polling = true;
-
         try {
-          const result = await logsService.getNewLogsForStream(
-            streamFilters,
-            lastCursor
-          );
+          const result = await logsService.getNewLogsForStream(streamFilters, lastCursor);
           lastCursor = result.lastCursor;
 
           for (const log of result.logs) {
-            writeEvent("log", log);
+            const metadata = (log.metadata as Record<string, unknown> | null) ?? {};
+            const env = metadata.env;
+            sendMessage({
+              type: "log",
+              data: {
+                id: log.id,
+                timestamp: log.timestamp,
+                level: log.level,
+                message: log.message,
+                service: typeof metadata.service === "string" ? metadata.service : "unknown",
+                environment:
+                  env === "staging" || env === "dev" || env === "prod" ? env : "prod",
+                metadata
+              }
+            });
           }
 
-          writeEvent("heartbeat", { timestamp: new Date().toISOString() });
+          sendMessage({ type: "heartbeat", timestamp: new Date().toISOString() });
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : "stream polling failed";
-          writeEvent("error", { message });
+          sendMessage({
+            type: "error",
+            message: error instanceof Error ? error.message : "ws polling failed"
+          });
         } finally {
           polling = false;
         }
@@ -154,7 +184,7 @@ export async function registerLogsController(app: FastifyInstance): Promise<void
 
       void poll();
 
-      request.raw.on("close", () => {
+      socket.on("close", () => {
         clearInterval(interval);
       });
     }

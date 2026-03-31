@@ -99,7 +99,12 @@ export async function createSource(input: CreateSourceInput): Promise<SourceDeta
 }
 
 export async function fetchSourceById(sourceId: string): Promise<SourceDetailResponse> {
-  const response = await fetch(`/api/sources/${sourceId}`, {
+  const normalizedSourceId = sourceId.trim();
+  if (!normalizedSourceId) {
+    throw new Error("Source id is required");
+  }
+
+  const response = await fetch(`/api/sources/${normalizedSourceId}`, {
     method: "GET"
   });
   if (!response.ok) {
@@ -116,7 +121,12 @@ export async function updateSourceById(
   sourceId: string,
   input: UpdateSourceInput
 ): Promise<SourceDetailResponse> {
-  const response = await fetch(`/api/sources/${sourceId}`, {
+  const normalizedSourceId = sourceId.trim();
+  if (!normalizedSourceId) {
+    throw new Error("Source id is required");
+  }
+
+  const response = await fetch(`/api/sources/${normalizedSourceId}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json"

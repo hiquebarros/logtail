@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { fetchSourceById, updateSourceById } from "@/lib/api/client";
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -14,8 +14,13 @@ const PLATFORM_LABEL: Record<string, string> = {
   OTHER: "Other"
 };
 
-function getIngestionRoute(sourceId: string): string {
-  return `/api/logs/${sourceId}`;
+function getIngestionApiUrl(): string {
+  const configuredBaseUrl = process.env.NEXT_PUBLIC_INGESTION_API_URL?.trim() ?? "";
+  if (!configuredBaseUrl) {
+    return "/logs";
+  }
+
+  return `${configuredBaseUrl.replace(/\/+$/, "")}/logs`;
 }
 
 function IconWrap({ children }: { children: ReactNode }) {
@@ -94,16 +99,11 @@ const PLATFORM_ICON: Record<string, ReactNode> = {
 export default function SourceDetailsPage() {
   const queryClient = useQueryClient();
   const params = useParams<{ sourceId: string }>();
-  const sourceId = params.sourceId;
-  const ingestionRoute = getIngestionRoute(sourceId);
+  const sourceId = params.sourceId?.trim() ?? "";
+  const ingestionApiUrl = getIngestionApiUrl();
   const [draftName, setDraftName] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"success" | "error">("success");
-  const [origin, setOrigin] = useState("");
-
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
 
   const sourceQuery = useQuery({
     queryKey: ["source", sourceId],
@@ -135,6 +135,17 @@ export default function SourceDetailsPage() {
     return <main className="p-6 text-sm text-zinc-400">Loading source details...</main>;
   }
 
+  if (!sourceId) {
+    return (
+      <main className="space-y-3 p-6 text-sm text-rose-300">
+        <p>Source id is missing from the route.</p>
+        <Link href="/sources" className="text-cyan-300 underline underline-offset-2">
+          Back to sources
+        </Link>
+      </main>
+    );
+  }
+
   if (sourceQuery.isError || !sourceQuery.data) {
     const message =
       sourceQuery.error instanceof Error ? sourceQuery.error.message : "Failed to load source";
@@ -156,14 +167,13 @@ export default function SourceDetailsPage() {
   const trimmedName = currentName.trim();
   const canSave = trimmedName.length > 0 && trimmedName.length <= 255;
   const isDirty = trimmedName !== source.name;
-  const ingestionHost = origin ? `${origin}${ingestionRoute}` : ingestionRoute;
   const platformLabel = PLATFORM_LABEL[source.language] || source.language;
   const platformIcon = PLATFORM_ICON[source.language] || <OtherIcon />;
   const verifyCommand = `curl -X POST \\
   -H 'Content-Type: application/json' \\
   -H 'Authorization: Bearer ${source.apiKey}' \\
   -d '{"applicationId":"${source.id}","logs":[{"timestamp":"'"$(date -u +'%Y-%m-%dT%H:%M:%SZ')"'","level":"info","message":"Hello!","metadata":{"source":"curl"}}]}' \\
-  ${ingestionHost}`;
+  ${ingestionApiUrl}`;
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -266,14 +276,14 @@ export default function SourceDetailsPage() {
             </div>
 
             <label className="space-y-1">
-              <span className="text-xs uppercase tracking-wide text-zinc-500">Ingestion host</span>
+              <span className="text-xs uppercase tracking-wide text-zinc-500">Ingestion API</span>
               <div className="group relative">
                 <input
-                  value={ingestionHost}
+                  value={ingestionApiUrl}
                   readOnly
                   title="Copy to clipboard"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => void copyToClipboard(ingestionHost)}
+                  onClick={() => void copyToClipboard(ingestionApiUrl)}
                   className="h-10 w-full cursor-pointer rounded-md border border-zinc-800 bg-zinc-900/70 px-3 font-mono text-xs text-zinc-400 outline-none focus:border-zinc-800 focus:outline-none focus:ring-0"
                 />
                 <span className="pointer-events-none absolute -top-7 right-2 rounded border border-zinc-700 bg-zinc-950 px-2 py-0.5 text-[10px] text-zinc-300 opacity-0 transition group-hover:opacity-100">

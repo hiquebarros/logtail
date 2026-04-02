@@ -78,6 +78,10 @@ function parseFiltersFromParams(params: URLSearchParams): LogFilters {
   };
 }
 
+function hasValidTimestamp(log: Log | null | undefined): log is Log {
+  return Boolean(log && typeof log.timestamp === "string" && log.timestamp.length > 0);
+}
+
 function buildFiltersParams(filters: LogFilters): URLSearchParams {
   const params = new URLSearchParams();
   params.set("rf", filters.timeRange.rf);
@@ -169,12 +173,15 @@ export function LogsPageClient() {
     [logsQuery.data?.pages],
   );
 
-  const logs = useMemo(() => [...liveLogs, ...baseLogs], [baseLogs, liveLogs]);
+  const logs = useMemo(
+    () => [...liveLogs, ...baseLogs].filter(hasValidTimestamp),
+    [baseLogs, liveLogs],
+  );
   const effectiveRangeToMs = Date.now();
   const visibleLogs = useMemo(
     () =>
       logs.filter((log) => {
-        const ts = new Date(log.timestamp).getTime();
+        const ts = Number(new Date(log.timestamp));
         return Number.isFinite(ts) && ts >= rangeFromMs && ts <= effectiveRangeToMs;
       }),
     [effectiveRangeToMs, logs, rangeFromMs],

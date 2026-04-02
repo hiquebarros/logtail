@@ -44,6 +44,7 @@ services:
       DB_NAME: ${DB_NAME:-logtail}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+      LIVE_TAIL_TOKEN_SECRET: ${LIVE_TAIL_TOKEN_SECRET:-dev-live-tail-token-secret-change-me-32-chars-min}
     command: sh -c "npm run prisma:migrate && npm run start"
     depends_on:
       db:
@@ -74,6 +75,7 @@ services:
       DB_NAME: ${DB_NAME:-logtail}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/logtail?schema=public}
       SESSION_SECRET: ${SESSION_SECRET:-dev-session-secret-change-me-32-chars-min}
+      LIVE_TAIL_TOKEN_SECRET: ${LIVE_TAIL_TOKEN_SECRET:-dev-live-tail-token-secret-change-me-32-chars-min}
     command: sh -c "npm run prisma:migrate && npm run start:ingestion"
     depends_on:
       db:

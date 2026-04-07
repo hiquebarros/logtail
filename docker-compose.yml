@@ -4,6 +4,11 @@ services:
       context: ./client
       dockerfile: Dockerfile
       target: runner
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://server:3001}
+        NEXT_PUBLIC_INGESTION_API_URL: ${NEXT_PUBLIC_INGESTION_API_URL:-http://ingest-api:3002}
+        NEXT_PUBLIC_ORGANIZATION_ID: ${NEXT_PUBLIC_ORGANIZATION_ID:-10000000-0000-4000-8000-000000000001}
+        NEXT_PUBLIC_APPLICATION_ID: ${NEXT_PUBLIC_APPLICATION_ID:-20000000-0000-4000-8000-000000000001}
     container_name: logtail-client
     restart: unless-stopped
     ports:

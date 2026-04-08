@@ -13,6 +13,8 @@ export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
     authScope.post("/auth/register", authController.register);
     authScope.post("/auth/verify-email", authController.verifyEmail);
     authScope.post("/auth/resend-verification", authController.resendVerification);
+    authScope.get("/auth/google/start", authController.googleStart);
+    authScope.get("/auth/google/callback", authController.googleCallback);
     authScope.post(
       "/auth/logout",
       { preHandler: [authScope.authenticate] },

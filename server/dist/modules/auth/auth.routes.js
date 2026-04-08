@@ -13,6 +13,8 @@ async function registerAuthRoutes(app) {
         authScope.post("/auth/register", authController.register);
         authScope.post("/auth/verify-email", authController.verifyEmail);
         authScope.post("/auth/resend-verification", authController.resendVerification);
+        authScope.get("/auth/google/start", authController.googleStart);
+        authScope.get("/auth/google/callback", authController.googleCallback);
         authScope.post("/auth/logout", { preHandler: [authScope.authenticate] }, authController.logout);
         authScope.post("/auth/switch-organization", { preHandler: [authScope.authenticate] }, authController.switchOrganization);
         authScope.get("/auth/me", { preHandler: [authScope.authenticate] }, authController.me);

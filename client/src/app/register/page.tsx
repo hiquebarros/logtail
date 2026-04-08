@@ -14,6 +14,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  const onContinueWithGoogle = () => {
+    const redirectTo = "/logs";
+    window.location.href = `/auth/google/start?redirectTo=${encodeURIComponent(redirectTo)}`;
+  };
+
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsLoading(true);
@@ -55,6 +60,20 @@ export default function RegisterPage() {
         </p>
 
         <form className="space-y-4" onSubmit={onSubmit}>
+          <button
+            type="button"
+            onClick={onContinueWithGoogle}
+            className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 text-sm font-medium text-zinc-100 transition hover:bg-zinc-900"
+          >
+            Continue with Google
+          </button>
+
+          <div className="flex items-center gap-3 py-1">
+            <div className="h-px flex-1 bg-zinc-800" />
+            <span className="text-xs text-zinc-500">or</span>
+            <div className="h-px flex-1 bg-zinc-800" />
+          </div>
+
           <label className="block space-y-1">
             <span className="text-sm text-zinc-300">Email</span>
             <input

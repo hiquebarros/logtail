@@ -75,6 +75,81 @@ class AuthService {
         });
         return created;
     }
+    async findOrCreateUserFromGoogle(identity) {
+        const email = identity.email.trim().toLowerCase();
+        const result = await client_2.prisma.$transaction(async (tx) => {
+            const byProvider = await tx.oAuthAccount.findUnique({
+                where: {
+                    provider_providerAccountId: {
+                        provider: "google",
+                        providerAccountId: identity.providerAccountId
+                    }
+                },
+                include: { user: true }
+            });
+            if (byProvider?.user) {
+                if (!byProvider.email && email) {
+                    await tx.oAuthAccount.update({
+                        where: { id: byProvider.id },
+                        data: { email }
+                    });
+                }
+                return byProvider.user;
+            }
+            const existingUser = await tx.user.findUnique({
+                where: { email }
+            });
+            if (existingUser) {
+                await tx.oAuthAccount.create({
+                    data: {
+                        userId: existingUser.id,
+                        provider: "google",
+                        providerAccountId: identity.providerAccountId,
+                        email
+                    }
+                });
+                if (!existingUser.emailVerifiedAt && identity.emailVerified) {
+                    return await tx.user.update({
+                        where: { id: existingUser.id },
+                        data: { emailVerifiedAt: new Date() }
+                    });
+                }
+                return existingUser;
+            }
+            const created = await tx.organization.create({
+                data: {
+                    name: `${(identity.name?.trim() || email.split("@")[0]).slice(0, 60)}'s Team`
+                }
+            });
+            const user = await tx.user.create({
+                data: {
+                    email,
+                    password: null,
+                    name: identity.name?.trim() || null,
+                    organizationId: created.id,
+                    emailVerifiedAt: identity.emailVerified ? new Date() : null
+                }
+            });
+            await tx.organizationMember.create({
+                data: {
+                    organizationId: created.id,
+                    userId: user.id,
+                    role: "owner",
+                    status: "active"
+                }
+            });
+            await tx.oAuthAccount.create({
+                data: {
+                    userId: user.id,
+                    provider: "google",
+                    providerAccountId: identity.providerAccountId,
+                    email
+                }
+            });
+            return user;
+        });
+        return result;
+    }
     async sendVerificationEmail(userId, appBaseUrl) {
         const user = await client_2.prisma.user.findUnique({
             where: { id: userId },

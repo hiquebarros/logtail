@@ -15,6 +15,7 @@ export async function registerSessionPlugin(
 ): Promise<void> {
   const sessionSecret =
     process.env.SESSION_SECRET || "dev-session-secret-change-me-32-chars-min";
+  const cookieDomain = process.env.SESSION_COOKIE_DOMAIN || undefined;
   const store = storeFactory();
 
   await app.register(cookie);
@@ -27,6 +28,7 @@ export async function registerSessionPlugin(
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
+      ...(cookieDomain ? { domain: cookieDomain } : {}),
       maxAge: 1000 * 60 * 60 * 24 * 7
     }
   });

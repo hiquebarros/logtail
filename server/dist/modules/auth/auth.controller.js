@@ -1,12 +1,25 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthController = void 0;
+const crypto_1 = require("crypto");
 const auth_schemas_1 = require("./auth.schemas");
 const auth_service_1 = require("./auth.service");
+const google_strategy_1 = require("../../strategies/google.strategy");
+function base64UrlEncode(buffer) {
+    return buffer
+        .toString("base64")
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+}
+function sha256Base64Url(input) {
+    return base64UrlEncode((0, crypto_1.createHash)("sha256").update(input).digest());
+}
 class AuthController {
-    constructor(authService, localStrategy) {
+    constructor(authService, localStrategy, googleStrategy = new google_strategy_1.GoogleStrategy()) {
         this.authService = authService;
         this.localStrategy = localStrategy;
+        this.googleStrategy = googleStrategy;
         this.login = async (request, reply) => {
             const parsed = auth_schemas_1.loginSchema.safeParse(request.body);
             if (!parsed.success) {
@@ -179,6 +192,94 @@ class AuthController {
                 success: true,
                 activeOrganization: context.activeOrganization
             });
+        };
+        this.googleStart = async (request, reply) => {
+            const parsed = auth_schemas_1.googleStartQuerySchema.safeParse(request.query);
+            if (!parsed.success) {
+                reply.code(400).send({
+                    message: "Invalid request query",
+                    issues: parsed.error.flatten()
+                });
+                return;
+            }
+            const clientId = process.env.GOOGLE_CLIENT_ID;
+            const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+            if (!clientId || !redirectUri) {
+                reply.code(500).send({ message: "Google OAuth is not configured" });
+                return;
+            }
+            const state = base64UrlEncode((0, crypto_1.randomBytes)(32));
+            const codeVerifier = base64UrlEncode((0, crypto_1.randomBytes)(48));
+            const codeChallenge = sha256Base64Url(codeVerifier);
+            request.session.oauth = {
+                ...(request.session.oauth || {}),
+                google: {
+                    state,
+                    codeVerifier,
+                    redirectTo: parsed.data.redirectTo
+                }
+            };
+            await request.session.save();
+            // Note: for a future "BFF" approach, frontend can host this flow too.
+            // For now the backend owns the callback and sets the session cookie.
+            const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+            url.searchParams.set("client_id", clientId);
+            url.searchParams.set("redirect_uri", redirectUri);
+            url.searchParams.set("response_type", "code");
+            url.searchParams.set("scope", "openid email profile");
+            url.searchParams.set("state", state);
+            url.searchParams.set("code_challenge_method", "S256");
+            url.searchParams.set("code_challenge", codeChallenge);
+            reply.redirect(url.toString());
+        };
+        this.googleCallback = async (request, reply) => {
+            const parsed = auth_schemas_1.googleCallbackQuerySchema.safeParse(request.query);
+            if (!parsed.success) {
+                reply.code(400).send({
+                    message: "Invalid request query",
+                    issues: parsed.error.flatten()
+                });
+                return;
+            }
+            const stored = request.session.oauth?.google;
+            if (!stored?.state || !stored.codeVerifier) {
+                reply.code(400).send({ message: "Missing OAuth session state. Please try again." });
+                return;
+            }
+            if (stored.state !== parsed.data.state) {
+                reply.code(400).send({ message: "Invalid OAuth state. Please try again." });
+                return;
+            }
+            try {
+                const identity = await this.googleStrategy.authenticate({
+                    code: parsed.data.code,
+                    state: parsed.data.state,
+                    codeVerifier: stored.codeVerifier
+                });
+                const user = await this.authService.findOrCreateUserFromGoogle(identity);
+                const activeMembership = await this.authService.getActiveMembershipForUser(user.id);
+                if (!activeMembership) {
+                    reply.code(403).send({ message: "User has no active organization membership" });
+                    return;
+                }
+                await this.authService.createUserSession(request, user, activeMembership.organizationId);
+                if (request.session.oauth?.google) {
+                    delete request.session.oauth.google;
+                }
+                await request.session.save();
+                const appBaseUrl = this.getAppBaseUrl().replace(/\/$/, "");
+                const redirectPath = stored.redirectTo?.startsWith("/")
+                    ? stored.redirectTo
+                    : "/";
+                reply.redirect(`${appBaseUrl}${redirectPath}`);
+            }
+            catch (error) {
+                if (error instanceof auth_service_1.AuthError) {
+                    reply.code(error.statusCode).send({ message: error.message });
+                    return;
+                }
+                throw error;
+            }
         };
     }
     getAppBaseUrl() {

@@ -13,6 +13,13 @@ declare module "fastify" {
       id: string;
       activeOrganizationId: string;
     };
+    oauth?: {
+      google?: {
+        state: string;
+        codeVerifier: string;
+        redirectTo?: string;
+      };
+    };
   }
   interface FastifyInstance {
     authenticate: (

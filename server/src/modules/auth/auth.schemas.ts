@@ -33,3 +33,12 @@ export const resendVerificationSchema = z.object({
 });
 
 export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+
+export const googleStartQuerySchema = z.object({
+  redirectTo: z.string().trim().min(1).max(2048).optional()
+});
+
+export const googleCallbackQuerySchema = z.object({
+  code: z.string().trim().min(1).max(2048),
+  state: z.string().trim().min(1).max(2048)
+});

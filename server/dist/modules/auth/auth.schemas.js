@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resendVerificationSchema = exports.verifyEmailSchema = exports.switchOrganizationSchema = exports.registerSchema = exports.loginSchema = void 0;
+exports.googleCallbackQuerySchema = exports.googleStartQuerySchema = exports.resendVerificationSchema = exports.verifyEmailSchema = exports.switchOrganizationSchema = exports.registerSchema = exports.loginSchema = void 0;
 const zod_1 = require("zod");
 exports.loginSchema = zod_1.z.object({
     email: zod_1.z.string().email(),
@@ -20,4 +20,11 @@ exports.verifyEmailSchema = zod_1.z.object({
 });
 exports.resendVerificationSchema = zod_1.z.object({
     email: zod_1.z.string().email()
+});
+exports.googleStartQuerySchema = zod_1.z.object({
+    redirectTo: zod_1.z.string().trim().min(1).max(2048).optional()
+});
+exports.googleCallbackQuerySchema = zod_1.z.object({
+    code: zod_1.z.string().trim().min(1).max(2048),
+    state: zod_1.z.string().trim().min(1).max(2048)
 });

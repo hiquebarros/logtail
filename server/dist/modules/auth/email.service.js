@@ -1,18 +1,16 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.EmailService = void 0;
-const nodemailer_1 = __importDefault(require("nodemailer"));
-const transport = nodemailer_1.default.createTransport({
-    host: "sandbox.smtp.mailtrap.io",
-    port: 2525,
-    auth: {
-        user: "821e09ac9d49ac",
-        pass: "fe7a86e0506ec7"
+const resend_1 = require("resend");
+function getRequiredEnv(name) {
+    const value = process.env[name]?.trim();
+    if (!value) {
+        throw new Error(`Missing required environment variable: ${name}`);
     }
-});
+    return value;
+}
+const resend = new resend_1.Resend(getRequiredEnv("RESEND_API_KEY"));
+const emailFrom = getRequiredEnv("EMAIL_FROM");
 class EmailService {
     async sendVerificationEmail(input) {
         const recipientName = input.toName?.trim() || "there";
@@ -56,9 +54,9 @@ class EmailService {
         </table>
       </div>
     `;
-        await transport.sendMail({
-            from: "Logtail <noreply@logtail.local>",
-            to: input.toEmail,
+        await resend.emails.send({
+            from: emailFrom,
+            to: [input.toEmail],
             subject,
             text: plainText,
             html

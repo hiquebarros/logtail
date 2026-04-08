@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 type SendVerificationEmailInput = {
   toEmail: string;
@@ -6,14 +6,16 @@ type SendVerificationEmailInput = {
   verificationUrl: string;
 };
 
-const transport = nodemailer.createTransport({
-  host: "sandbox.smtp.mailtrap.io",
-  port: 2525,
-  auth: {
-    user: "821e09ac9d49ac",
-    pass: "fe7a86e0506ec7"
+function getRequiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
   }
-});
+  return value;
+}
+
+const resend = new Resend(getRequiredEnv("RESEND_API_KEY"));
+const emailFrom = getRequiredEnv("EMAIL_FROM");
 
 export class EmailService {
   async sendVerificationEmail(input: SendVerificationEmailInput): Promise<void> {
@@ -60,9 +62,9 @@ export class EmailService {
       </div>
     `;
 
-    await transport.sendMail({
-      from: "Logtail <noreply@logtail.local>",
-      to: input.toEmail,
+    await resend.emails.send({
+      from: emailFrom,
+      to: [input.toEmail],
       subject,
       text: plainText,
       html

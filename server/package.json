@@ -17,21 +17,20 @@
     "worker:ingestion:dev": "tsx watch src/workers/ingestion.worker.ts"
   },
   "dependencies": {
-    "@fastify/websocket": "^11.0.2",
     "@fastify/cookie": "^11.0.2",
     "@fastify/session": "^11.1.1",
+    "@fastify/websocket": "^11.0.2",
     "@prisma/client": "^6.19.2",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.58.0",
     "fastify": "^5.2.1",
     "ioredis": "^5.8.1",
-    "nodemailer": "^8.0.4",
+    "resend": "^6.10.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^22.13.10",
-    "@types/nodemailer": "^7.0.11",
     "prisma": "^6.19.2",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"

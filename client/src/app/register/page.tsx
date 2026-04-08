@@ -51,7 +51,7 @@ export default function RegisterPage() {
       <section className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-6">
         <h1 className="mb-1 text-lg font-semibold text-zinc-100">Create account</h1>
         <p className="mb-6 text-sm text-zinc-400">
-          Start your Logtail workspace. We&apos;ll send a confirmation link to your email.
+          Start your Logmole workspace. We&apos;ll send a confirmation link to your email.
         </p>
 
         <form className="space-y-4" onSubmit={onSubmit}>

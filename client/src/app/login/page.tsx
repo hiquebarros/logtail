@@ -86,7 +86,7 @@ function LoginPageContent() {
       <section className="w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-900 p-6">
         <h1 className="mb-1 text-lg font-semibold text-zinc-100">Sign in</h1>
         <p className="mb-6 text-sm text-zinc-400">
-          Sign in to your Logtail account.
+          Sign in to your Logmole account.
         </p>
 
         <form className="space-y-4" onSubmit={onSubmit}>
@@ -124,7 +124,7 @@ function LoginPageContent() {
         </form>
 
         <p className="mt-5 text-sm text-zinc-400">
-          New to Logtail?{" "}
+          New to Logmole?{" "}
           <Link href="/register" className="text-cyan-300 hover:text-cyan-200">
             Create account
           </Link>

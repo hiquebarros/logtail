@@ -244,7 +244,7 @@ async function seedAuthUsers(): Promise<void> {
 
   const admin = await prisma.user.upsert({
     where: {
-      email: "admin@logtail.dev"
+      email: "admin@logmole.dev"
     },
     update: {
       password: passwordHash,
@@ -252,7 +252,7 @@ async function seedAuthUsers(): Promise<void> {
     },
     create: {
       organizationId: orgOne,
-      email: "admin@logtail.dev",
+      email: "admin@logmole.dev",
       password: passwordHash,
       name: "Admin User"
     }
@@ -260,7 +260,7 @@ async function seedAuthUsers(): Promise<void> {
 
   const operator = await prisma.user.upsert({
     where: {
-      email: "ops@logtail.dev"
+      email: "ops@logmole.dev"
     },
     update: {
       password: passwordHash,
@@ -268,7 +268,7 @@ async function seedAuthUsers(): Promise<void> {
     },
     create: {
       organizationId: orgOne,
-      email: "ops@logtail.dev",
+      email: "ops@logmole.dev",
       password: passwordHash,
       name: "Ops User"
     }
@@ -331,7 +331,7 @@ async function seedAuthUsers(): Promise<void> {
     }
   });
 
-  console.log("Seeded auth users admin@logtail.dev and ops@logtail.dev.");
+  console.log("Seeded auth users admin@logmole.dev and ops@logmole.dev.");
 }
 
 async function main(): Promise<void> {

@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Logtail Ops",
-  description: "Modern log management frontend",
+  title: "Logmole",
+  description: "Logmole is a modern log management platform",
 };
 
 export default function RootLayout({

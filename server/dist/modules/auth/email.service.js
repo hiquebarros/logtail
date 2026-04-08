@@ -14,11 +14,11 @@ const emailFrom = getRequiredEnv("EMAIL_FROM");
 class EmailService {
     async sendVerificationEmail(input) {
         const recipientName = input.toName?.trim() || "there";
-        const subject = "Confirm your Logtail email";
+        const subject = "Confirm your Logmole email";
         const plainText = [
             `Hi ${recipientName},`,
             "",
-            "Thanks for signing up to Logtail.",
+            "Thanks for signing up to Logmole.",
             "Confirm your email address to activate your account:",
             input.verificationUrl,
             "",
@@ -29,14 +29,14 @@ class EmailService {
         <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;margin:0 auto;background:#111;border:1px solid #27272a;border-radius:12px;overflow:hidden;">
           <tr>
             <td style="padding:28px 28px 12px 28px;">
-              <p style="margin:0 0 10px 0;color:#a1a1aa;font-size:12px;letter-spacing:.08em;text-transform:uppercase;">Logtail</p>
+              <p style="margin:0 0 10px 0;color:#a1a1aa;font-size:12px;letter-spacing:.08em;text-transform:uppercase;">Logmole</p>
               <h1 style="margin:0;color:#fafafa;font-size:24px;line-height:1.3;font-weight:600;">Confirm your email</h1>
             </td>
           </tr>
           <tr>
             <td style="padding:8px 28px 10px 28px;color:#d4d4d8;font-size:15px;line-height:1.6;">
               Hi ${escapeHtml(recipientName)},<br/><br/>
-              Welcome to Logtail. Click the button below to verify your email address and finish creating your account.
+              Welcome to Logmole. Click the button below to verify your email address and finish creating your account.
             </td>
           </tr>
           <tr>

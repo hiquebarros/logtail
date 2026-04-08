@@ -91,7 +91,7 @@ function VerifyEmailPageContent() {
             ? "We are confirming your account now."
             : isVerified
               ? "Thanks for verifying your email."
-              : "Confirm your account to start using Logtail."}
+              : "Confirm your account to start using Logmole."}
         </p>
 
         {isVerifying ? (
